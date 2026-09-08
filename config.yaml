@@ -2,7 +2,10 @@
 
 markets: [KOSPI, KOSDAQ]
 
-# 기간 정의 (calendar 기준, 시작일은 해당 날짜 이전 가장 가까운 거래일)
+# 기간 정의 (DESIGN.md 2절): 구간 [from, T]
+#  - kind: calendar  → 기준 날짜 = T - days/months/years, from = 기준 날짜 이후 가장 가까운 거래일
+#  - kind: trading_days → from = T 에서 (days-1) 거래일 전 (1d 는 from = T)
+#  - 기준가 = from 직전 거래일 종가
 periods:
   1d: {days: 1, kind: trading_days}
   1w: {days: 7, kind: calendar}
