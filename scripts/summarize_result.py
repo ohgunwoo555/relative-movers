@@ -52,8 +52,28 @@ def main(kind: str) -> int:
                 for w in m.get("warnings", []):
                     print(f"  - ⚠️ {w}")
         print(f"- cache check: `{r.get('cache_check')}` · stats `{r.get('fetch_stats')}`")
+        print(f"- KIND debug: `{r.get('kind_debug')}`")
         print(f"- compare previous: `{r.get('compare_previous')}`")
         calls_table(r)
+    elif kind == "calc":
+        w = r.get("window") or {}
+        c = r.get("calc") or {}
+        print(f"- **{r.get('market')} {r.get('period')}** · from {w.get('from')} · 기준가일 {w.get('base_date')} · "
+              f"market_ret {c.get('market_ret')}% · calc rows {c.get('n_rows')} · top_n {r.get('top_n')}")
+        u = r.get("universe") or {}
+        if u.get("steps"):
+            print("- universe: " + " → ".join(f"{k}={v}" for k, v in u["steps"]))
+        for wmsg in u.get("warnings", []):
+            print(f"  - ⚠️ {wmsg}")
+        print(f"- inputs: `{r.get('inputs')}` · excess_ret stats `{c.get('excess_ret_stats')}`")
+        t = r.get("tables") or {}
+        if t:
+            print(f"\n### up {r.get('top_n')}\n{t.get('up')}\n\n### down {r.get('top_n')}\n{t.get('down')}")
+        print("\n| step | sec |\n|---|---|")
+        for st in r.get("steps", []):
+            print(f"| {st['step']} | {st['sec']} |")
+        if r.get("error"):
+            print(f"- ❌ {r['error']}")
     return 0
 
 

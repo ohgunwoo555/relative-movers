@@ -120,6 +120,8 @@ def main() -> int:
         print(res.summary())
         summary["markets"][market] = m
 
+    summary["kind_debug"] = fetcher.kind_debug
+
     # 캐시 히트 확인: 같은 호출을 다시 하면 네트워크 없이 즉시 반환
     before = dict(fetcher.stats)
     t0 = time.perf_counter()

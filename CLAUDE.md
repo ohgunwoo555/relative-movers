@@ -80,7 +80,7 @@ SQLite 테이블 `movers`는 동일 스키마, PK = `(base_date, market, period,
 1. ✅ 환경·데이터 검증 (pykrx 5종 호출, 액면분할 검증, 소요시간) — 결과: `docs/stage1_validation.md`
 2. ✅ calendar.py + universe.py + 테스트 (관리종목 소스는 `validate_universe` 워크플로 결과로 확정 — docs/administrative_issue.md)
 3. ✅ fetch.py (캐시·재시도) — 관리종목 KIND 경로는 `validate_fetch` 워크플로 결과로 확정
-4. calc.py + rank.py — (KOSPI, 1d) 한 조합 먼저 끝까지, 이후 루프 확장
+4. **진행 중** calc.py + rank.py 작성 완료, (KOSPI, 1d) 한 조합은 `scripts/run_one.py` / `validate_calc` 워크플로로 검증. 루프 확장은 검증 후
 5. report.py + main.py — 20개 랭킹 통합 출력, SQLite 저장
 6. notify.py + 스케줄러
 7. 백필 (선택)
@@ -96,6 +96,10 @@ SQLite 테이블 `movers`는 동일 스키마, PK = `(base_date, market, period,
   `exclude.*`가 켜져 있는데 목록이 None이면 **경고 로그 + `warnings` 기록 + 미적용**. 조용히 건너뛰지 않는다.
 - 기간 수익률 프레임은 계산 전에 반드시 `inner_join_universe`로 T 유니버스와 결합한다(상장폐지 -100 행·신규상장 제거).
   거래정지는 `suspended_mask`(구간 거래량 0)로 calc 단계에서 제외.
+- `src/calc.py`는 순수 계산이다. stock_ret은 KRX 등락률을 그대로 쓰지 않고 `종가/시가 - 1`로 다시 계산하며(정의 우선),
+  KRX 등락률과 0.05%p 넘게 다르면 경고만 남긴다. market_ret은 지수 일봉에서 기준가일과 T 종가를 찾고 없으면 `CalcError`.
+- `src/rank.py` 동률 규칙은 DESIGN.md 7절. rank는 위치 1..N, 공동 순위 없음.
+- 한 조합 실행은 `python scripts/run_one.py --market KOSPI --period 1d`. 오케스트레이션은 5단계에서 main.py로 옮긴다.
 - `src/fetch.py`의 `Fetcher`가 유일한 네트워크 진입점이다. pykrx는 `_pykrx()`에서 지연 import하고 `KRX_ID/KRX_PW` 없음은
   `KRXCredentialsError`, 접속·재시도 실패는 `KRXUnavailableError`. 캐시는 `data/cache/<날짜>/<엔드포인트>__<인자>.json`.
   테스트는 `pykrx_ns`, `sleep_fn`, `http_post`, `env`를 주입한다(tests/test_fetch.py 참고).

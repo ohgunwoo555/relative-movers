@@ -103,12 +103,15 @@ def etx_mask(listed: pd.DataFrame, tickers: Iterable[str]) -> pd.Series:
 def administrative_from_sect(listed: pd.DataFrame, col: str = "sect") -> set[str] | None:
     """KRX 전종목시세의 소속부(SECT_TP_NM)에 '관리종목' 이 표기된 티커.
 
-    KOSDAQ 은 소속부로 관리종목이 표기되지만 KOSPI 커버리지는 검증 전이다(docs/administrative_issue.md).
+    KOSDAQ 만 소속부에 표기된다(실측 129종목). KOSPI 는 소속부가 전부 빈 값이라 여기서 판별할 수 없다(docs/administrative_issue.md).
     컬럼이 없으면 None (= 판별 불가).
     """
     if col not in listed.columns:
         return None
-    return set(listed.index[listed[col].astype(str).str.contains(ADMINISTRATIVE_SECT_KEYWORD, na=False)])
+    # 실측 값: '관리종목(소속부없음)' 129 / '투자주의환기종목(소속부없음)' 41 / 'SPAC(소속부없음)' / '외국기업(소속부없음)' …
+    # '관리종목' 으로 *시작* 하는 값만 센다 (투자주의환기종목 등은 제외 대상이 아니다)
+    sect = listed[col].astype(str).str.strip()
+    return set(listed.index[sect.str.startswith(ADMINISTRATIVE_SECT_KEYWORD)])
 
 
 def administrative_mask(listed: pd.DataFrame, tickers: Iterable[str]) -> pd.Series:

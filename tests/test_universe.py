@@ -107,6 +107,14 @@ def test_administrative_from_sect(listed):
     assert administrative_from_sect(listed.drop(columns="sect")) is None
 
 
+def test_administrative_from_sect_counts_only_administrative_values():
+    # 2026-09-07 KOSDAQ 실측 소속부 값 분포를 그대로 흉내 낸다
+    df = listed_frame({"a": "A", "b": "B", "c": "C", "d": "D", "e": "E", "f": "F"},
+                      {"a": "관리종목(소속부없음)", "b": "투자주의환기종목(소속부없음)", "c": "SPAC(소속부없음)",
+                       "d": "외국기업(소속부없음)", "e": "중견기업부", "f": " 관리종목 "})
+    assert administrative_from_sect(df) == {"a", "f"}
+
+
 # ── build_universe ───────────────────────────────────────────────────────
 def test_build_universe_all_filters(listed):
     res = build_universe(listed, "KOSPI", CONFIG, etf_tickers={"069500"}, etn_tickers={"500001"},

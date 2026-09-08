@@ -39,3 +39,19 @@
   2. 실패·0건이면 KOSDAQ 은 `administrative_from_sect(listed)`, KOSPI 는 None (WARNING).
 - 검증: `validate_fetch` 워크플로가 KIND 파싱 건수, 시장별 교집합, KOSDAQ 소속부 129와의 겹침을 `docs/results/fetch_result.json` 에 남긴다.
   KIND 가 동작하지 않으면 다음 후보는 KRX 정보데이터시스템의 관리종목 화면(bld 미확인)이며, 그때까지 KOSPI 관리종목 필터는 미적용 상태가 경고로 드러난다.
+
+## 3단계 실측 (2026-09-08 `validate_fetch`, T = 2026-09-07) — KOSPI 항목 확정
+- KIND POST(`method=searchAdminIssueSub`, `forward=adminissue_sub`): 응답은 왔지만 `companysummary_open('XXXXXX')` 패턴 **0건**
+  (`kind_codes_total: 0`, 4.1초). 파라미터 또는 HTML 구조가 가정과 다르다. 다음 실행부터 `kind_debug`(응답 길이·앞 400자)가 기록된다.
+- KOSDAQ 소속부: **129종목**, `관리종목(소속부없음)` 값만 집계됨(투자주의환기 41·SPAC 65·외국기업 15는 미포함). 매칭을 '관리종목'으로 시작하는 값으로 한정했다.
+
+### 확정
+| 시장 | 상태 | 동작 |
+|---|---|---|
+| KOSDAQ | **적용** | 전종목시세 소속부 `관리종목*` (추가 호출 0회) |
+| KOSPI | **미적용 (경고)** | 소속부 빈 값 + KIND 파싱 0건 → `administrative_tickers` 가 None → `-administrative(미적용)` 단계와 WARNING 으로 드러남 |
+
+KOSPI 후속 후보 (별도 작업, 현재 파이프라인은 경고 상태로 진행):
+1. `kind_debug` 로 KIND 응답 확인 후 파라미터/파서 수정 (예: `marketType=stockMkt`, 페이지 크기, 응답이 iframe/JS 렌더링인지)
+2. KRX 정보데이터시스템 관리종목 화면(bld 미확인) — 로그인 세션으로 `bld` 탐색 필요
+3. KOSPI 관리종목은 통상 10~20종목 수준이라 랭킹 영향이 제한적이지만, 하위 N 에 섞일 가능성이 있어 결과 리포트에 경고를 함께 출력한다

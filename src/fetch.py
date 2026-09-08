@@ -115,7 +115,7 @@ class Fetcher:
     """pykrx 호출 래퍼. 테스트에서는 `pykrx_ns`(stock, core 네임스페이스)와 `sleep_fn`, `http_post` 를 주입한다."""
 
     def __init__(self, config: Mapping, *, cache_dir: str | Path | None = None,
-                 pykrx_ns: Any = None, sleep_fn: Callable[[float], None] = time.sleep,
+                 pykrx_ns: Any = None, sleep_fn: Callable[[float], None] | None = None,
                  http_post: Callable[..., Any] | None = None, env: Mapping[str, str] | None = None):
         fcfg = dict(config.get("fetch", {}) or {})
         self.sleep_sec = float(fcfg.get("sleep_sec", 1))
@@ -123,10 +123,11 @@ class Fetcher:
         self.timeout_sec = max(float(fcfg.get("timeout_sec", DEFAULT_TIMEOUT_SEC)), 15.0)
         self.cache_dir = Path(cache_dir or fcfg.get("cache_dir", "data/cache"))
         self._ns = pykrx_ns
-        self._sleep = sleep_fn
+        self._sleep = sleep_fn if sleep_fn is not None else (lambda sec: time.sleep(sec))  # 호출 시점에 time.sleep 해석 (테스트 패치 가능)
         self._http_post = http_post
         self._env = env if env is not None else os.environ
         self.stats = {"network_calls": 0, "cache_hits": 0, "retries": 0}
+        self.kind_debug: dict = {}   # 마지막 KIND 관리종목 응답 진단 (validate_fetch 가 기록)
 
     # ── pykrx 지연 import ────────────────────────────────────────────────
     def _pykrx(self):
@@ -245,6 +246,7 @@ class Fetcher:
             log.warning("KIND 관리종목 조회 실패: %s", e)
             return None
         codes = set(KIND_CODE_RE.findall(html or ""))
+        self.kind_debug = {"length": len(html or ""), "n_codes": len(codes), "head": (html or "")[:400]}
         if not codes:
             log.warning("KIND 관리종목 페이지에서 종목코드를 찾지 못함 (length=%d)", len(html or ""))
             return None

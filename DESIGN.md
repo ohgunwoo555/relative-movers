@@ -106,9 +106,15 @@ relative-movers/
 | start_date, start_close, end_close | start_date = 구간 시작 거래일 from, start_close = 기준가(from 직전 거래일 종가), end_close = close(T) |
 | stock_ret, market_ret | % |
 | excess_ret | %p (정렬 키) |
-| market_cap, trading_value | 부가정보 |
+| market_cap, trading_value | 부가정보. market_cap = T 시점 시가총액, trading_value = 구간 [from, T] 누적 거래대금 (`get_market_price_change`의 거래대금) |
 
 SQLite 테이블 `movers`는 동일 스키마. PK = (base_date, market, period, direction, rank).
+
+랭킹 규칙 (rank.py):
+- 정렬 키 excess_ret. up = 내림차순, down = 오름차순
+- 동률: stock_ret(up은 큰 쪽, down은 작은 쪽) → market_cap 큰 쪽 → ticker 오름차순. 비교는 소수 6자리 반올림
+- rank는 정렬 위치 1..N. 공동 순위 없음(PK 유지). excess_ret이 NaN인 행은 랭킹 대상에서 제외
+- 거래대금 하한(`filters.min_avg_trading_value`)은 구간 누적 거래대금 ÷ 구간 거래일 수(지수 일봉 기준)로 판정
 
 ## 8. 엣지 케이스
 - 신규상장: 제외 / 거래정지: 옵션 제외 / 상장폐지: T 목록 기준이라 자연 탈락
