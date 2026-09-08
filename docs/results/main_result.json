@@ -4,14 +4,14 @@
   "note": "20260909 는 휴장일 — 종료 (exit 3)",
   "top_n": 20,
   "exit_code": 3,
-  "total_sec": 3.8,
+  "total_sec": 4.9,
   "combos": [],
   "failures": [],
   "universes": {},
   "warnings": [],
   "failure": null,
   "timings": {
-    "resolve_base_date": 3.78
+    "resolve_base_date": 4.91
   },
   "fetch_stats": {
     "network_calls": 1,
@@ -20,5 +20,5 @@
   },
   "n_movers_rows": 0,
   "paths": {},
-  "run_at": "2026-09-08T23:32:38"
+  "run_at": "2026-09-08T23:45:54"
 }
