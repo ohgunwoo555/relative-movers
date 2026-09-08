@@ -81,6 +81,26 @@ def main(kind: str) -> int:
         print("\n| step | sec |\n|---|---|")
         for st in r.get("steps", []):
             print(f"| {st['step']} | {st['sec']} |")
+    elif kind == "main":
+        print(f"- combos {sum(1 for c in r.get('combos', []) if c.get('ok'))}/{len(r.get('combos', []))} 성공 · movers rows {r.get('n_movers_rows')} · "
+              f"exit {r.get('exit_code')} · fetch `{r.get('fetch_stats')}`")
+        print("\n| market | period | ok | from | 기준가일 | market_ret | rows | price_change(s) | index(s) | error |\n|---|---|---|---|---|---|---|---|---|---|")
+        for c in r.get("combos", []):
+            w = c.get("window") or {}
+            tmg = c.get("timings") or {}
+            mr = c.get("market_ret")
+            print(f"| {c['market']} | {c['period']} | {'✅' if c.get('ok') else '❌'} | {w.get('from', '-')} | {w.get('base_date', '-')} | "
+                  f"{(f'{mr:+.2f}%' if mr is not None else '-')} | {c.get('n_calc_rows')} | {tmg.get('price_change', '-')} | "
+                  f"{tmg.get('index_ohlcv', '-')} | {(c.get('error_class') or '') + ' ' + (c.get('error') or '')[:80]} |")
+        for w in r.get("warnings", []):
+            print(f"- ⚠️ {w}")
+        for f in r.get("failures", []):
+            print(f"- ❌ {f['market']} {f['period']}: [{f.get('error_class')}] {f.get('error')}")
+        print(f"- 공통 타이밍: `{r.get('timings')}` · paths `{r.get('paths')}`")
+        md = RESULTS / "movers.md"
+        if md.exists():
+            print("\n---\n")
+            print(md.read_text(encoding="utf-8"))
     return 0
 
 

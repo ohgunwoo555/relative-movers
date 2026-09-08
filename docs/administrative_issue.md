@@ -55,3 +55,22 @@ KOSPI 후속 후보 (별도 작업, 현재 파이프라인은 경고 상태로 �
 1. `kind_debug` 로 KIND 응답 확인 후 파라미터/파서 수정 (예: `marketType=stockMkt`, 페이지 크기, 응답이 iframe/JS 렌더링인지)
 2. KRX 정보데이터시스템 관리종목 화면(bld 미확인) — 로그인 세션으로 `bld` 탐색 필요
 3. KOSPI 관리종목은 통상 10~20종목 수준이라 랭킹 영향이 제한적이지만, 하위 N 에 섞일 가능성이 있어 결과 리포트에 경고를 함께 출력한다
+
+## KOSPI 후속 후보 조사: KRX 정보데이터시스템 "관리종목 현황" 화면 (2026-09-08, 조사만 — 구현은 별도)
+
+pykrx 의 모든 KRX 조회는 같은 방식이다: `POST https://data.krx.co.kr/comm/bldAttendant/getJsonData.cmd` 에
+`bld=dbms/MDC/STAT/standard/MDCSTATxxxxx` + 화면별 파라미터(`mktId`, `trdDd`, `strtDd/endDd` …)를 보내고 `OutBlock_1`/`output` JSON 을 받는다
+(`pykrx/website/krx/krxio.py::KrxWebIo`, 로그인 세션 쿠키는 `webio.Post.read` 가 자동으로 붙인다).
+따라서 관리종목 화면도 **bld 코드와 파라미터만 알면 pykrx 세션을 재사용해 한 클래스로 붙일 수 있다.**
+
+| 항목 | 내용 |
+|---|---|
+| 화면 위치 | KRX 정보데이터시스템(data.krx.co.kr) → 통계 → 기본통계 → 주식 → 종목정보 → **관리종목** (`투자주의환기종목`, `거래정지종목` 화면도 같은 메뉴) |
+| bld | **미확인**. pykrx 1.2.8 에 포함된 bld 는 `MDCSTAT01501`(전종목시세)·`MDCSTAT01602`(전종목등락률)·`MDCSTAT01901`(전종목기본정보) 등이며 관리종목용 코드는 없다. 이 환경은 KRX 가 차단되어 직접 확인 불가 |
+| 확인 방법 | 브라우저에서 해당 화면을 열고 개발자도구 Network 탭에서 `getJsonData.cmd` 요청의 Form Data 를 본다. `bld` 값과 함께 넘어가는 파라미터(예: `mktId=STK/KSQ/ALL`, `trdDd=YYYYMMDD`, `share`, `money`, `csvxls_isNo`)를 그대로 옮기면 된다 |
+| 구현 스케치 | ```python\nfrom pykrx.website.krx.krxio import KrxWebIo\nclass 관리종목현황(KrxWebIo):\n    @property\n    def bld(self): return \"dbms/MDC/STAT/standard/MDCSTATxxxxx\"  # 확인 후 기입\n    def fetch(self, trdDd, mktId=\"ALL\"):\n        return DataFrame(self.read(mktId=mktId, trdDd=trdDd)[\"OutBlock_1\"])\n``` → `Fetcher._krx_administrative_codes(T)` 로 감싸 `ISU_SRT_CD` 집합 반환, KIND 보다 앞 순위로 시도 |
+| 장점 | 로그인 세션·캐시·재시도·타임아웃을 그대로 재사용, T 시점(`trdDd`) 지정 가능(백필 가능), KOSPI·KOSDAQ 동시 |
+| 리스크 | bld/파라미터가 화면 개편으로 바뀔 수 있음. 응답 컬럼명(`ISU_SRT_CD` 등)도 확인 필요 |
+| 검증 계획 | bld 확인 후 `validate_fetch` 에 프로브 추가: 응답 행수, KOSDAQ 소속부 129 종목과의 겹침(=정확도 근거), KOSPI 건수 |
+
+우선순위(구현 시): ① KRX 관리종목 현황(bld 확인되면) → ② KIND POST(파라미터·파서 수정) → ③ KOSDAQ 소속부(현행). 그때까지 KOSPI 는 경고 상태.

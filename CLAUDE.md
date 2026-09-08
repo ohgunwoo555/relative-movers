@@ -80,8 +80,8 @@ SQLite 테이블 `movers`는 동일 스키마, PK = `(base_date, market, period,
 1. ✅ 환경·데이터 검증 (pykrx 5종 호출, 액면분할 검증, 소요시간) — 결과: `docs/stage1_validation.md`
 2. ✅ calendar.py + universe.py + 테스트 (관리종목 소스는 `validate_universe` 워크플로 결과로 확정 — docs/administrative_issue.md)
 3. ✅ fetch.py (캐시·재시도) — 관리종목 KIND 경로는 `validate_fetch` 워크플로 결과로 확정
-4. **진행 중** calc.py + rank.py 작성 완료, (KOSPI, 1d) 한 조합은 `scripts/run_one.py` / `validate_calc` 워크플로로 검증. 루프 확장은 검증 후
-5. report.py + main.py — 20개 랭킹 통합 출력, SQLite 저장
+4. ✅ calc.py + rank.py — (KOSPI, 1d) `validate_calc` 실측 검증 완료 (2026-09-08, market_ret +4.61%, 801종목)
+5. **진행 중** report.py + main.py 작성 완료 — `validate_main` 워크플로로 전체 실행 검증 후 1y 소요시간을 docs/stage1_validation.md 4-1절에 기입
 6. notify.py + 스케줄러
 7. 백필 (선택)
 
@@ -99,7 +99,10 @@ SQLite 테이블 `movers`는 동일 스키마, PK = `(base_date, market, period,
 - `src/calc.py`는 순수 계산이다. stock_ret은 KRX 등락률을 그대로 쓰지 않고 `종가/시가 - 1`로 다시 계산하며(정의 우선),
   KRX 등락률과 0.05%p 넘게 다르면 경고만 남긴다. market_ret은 지수 일봉에서 기준가일과 T 종가를 찾고 없으면 `CalcError`.
 - `src/rank.py` 동률 규칙은 DESIGN.md 7절. rank는 위치 1..N, 공동 순위 없음.
-- 한 조합 실행은 `python scripts/run_one.py --market KOSPI --period 1d`. 오케스트레이션은 5단계에서 main.py로 옮긴다.
+- 오케스트레이션은 `src/main.py`(`run` → `write_outputs`)에만 있다. `scripts/run_one.py`는 `run(markets=[m], periods=[p])`를 호출하는 얇은 래퍼.
+  전체 실행은 `python -m src.main`. 종료코드 0/1/2/3 은 DESIGN.md 6절. 한 조합 실패는 `ComboResult.error`에 담고 나머지는 계속 진행한다.
+- `src/report.py`: CSV(utf-8-sig)·Markdown·SQLite `INSERT OR REPLACE`(PK 교체, `updated_at` 컬럼 추가). 계산 금지.
+- 워크플로 `validate_main`은 SQLite를 `docs/results/movers.db`에 두어 git으로 누적하고, `movers_<T>.csv/.md`와 `main_result_<T>.json`을 커밋한다.
 - `src/fetch.py`의 `Fetcher`가 유일한 네트워크 진입점이다. pykrx는 `_pykrx()`에서 지연 import하고 `KRX_ID/KRX_PW` 없음은
   `KRXCredentialsError`, 접속·재시도 실패는 `KRXUnavailableError`. 캐시는 `data/cache/<날짜>/<엔드포인트>__<인자>.json`.
   import 실패(KRX가 JSON 대신 HTML 응답 → JSONDecodeError)도 재시도·백오프하며, 최종 실패는 `diagnose_krx_failure`로

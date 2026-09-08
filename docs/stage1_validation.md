@@ -152,6 +152,8 @@ python scripts/validate_stage1.py                      # 기본: 포스코스틸
   `종가 0, 등락률 -100` 행으로 덧붙이기 때문. DESIGN.md 6절의 "T 시점 유니버스와 inner join" 으로 자연 제거된다(calc 전에 join 필수).
 - **본 실행 예상 비용**: 호출당 ≈1~2초 + sleep 1초. 2시장 × 5기간 전종목 등락률(10회, 각 KRX 요청 4회) + 지수 10회 + 유니버스·시총 ≈ 30회 → 약 1~2분.
   1년치 전종목 등락률은 이번에 생략했으므로 첫 본 실행에서 시간을 기록할 것(730일 미만이라 분할 조회 없음).
+  → **기입란 (validate_main 첫 실행 후)**: `docs/results/main_result.json` 의 `combos[*].timings.price_change` 중 period=1y 값.
+     KOSPI 1y: _(미기입)_ s · KOSDAQ 1y: _(미기입)_ s · 전체 실행: _(미기입)_ s
 - **첫 호출 지연**: 엔드포인트별 첫 호출이 6~8초 걸린다. 재시도 타임아웃은 15초 이상으로 잡는다.
 - **네이버 수정주가 경로도 GitHub 러너에서 정상**(1.01초). 예외 경로는 지금 불필요하지만 fetch.py 에 함수만 남겨 둔다.
 - 워크플로 경고: `actions/*@v4/v5` 가 Node 20 기반이라 deprecation 경고. 동작에는 영향 없음. 6단계에서 최신 메이저로 올린다.

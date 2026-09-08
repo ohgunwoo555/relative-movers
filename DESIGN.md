@@ -92,7 +92,10 @@ relative-movers/
    - 유니버스와 inner join (신규상장 자동 탈락)
    - 초과수익률 계산 → 거래대금 필터 → 상위 N / 하위 N
 4. 20개 랭킹을 long-format 테이블로 통합
-5. `outputs/T/movers.csv`, `movers.md` 저장 + SQLite 누적 + 알림
+5. `outputs/T/movers.csv`, `movers.md` 저장 + SQLite 누적(`INSERT OR REPLACE`, PK 기준 교체) + 알림
+
+종료코드: 0 전부 성공 / 1 일부·전부 실패(한 조합 실패 시 나머지는 계속 진행하고 성공분은 저장, 실패 목록·원인 분류를 마지막에 보고) /
+2 자격증명 없음 / 3 휴장일. 유니버스·시총은 시장당 1회, ETF/ETN 목록은 실행당 1회만 조회한다
 
 ## 7. 결과 스키마 (long format)
 | 컬럼 | 설명 |
