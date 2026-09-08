@@ -1,7 +1,8 @@
 """T(기준일) 및 기간 구간 계산 — DESIGN.md 2절.
 
 정의 (DESIGN.md 2절이 원본):
-  T          실행 시점 기준 직전 거래일. 실행일이 휴장일이면 None (main.py가 즉시 종료)
+  T          실행일 직전 거래일 = nearest(실행일 − 1일, prev=True). 실행일 자체가 거래일인지는 묻지 않는다.
+             실행일이 주말이면 None (main.py가 exit 3). "이미 산출된 T" 판정은 main.py(daily CSV 존재)가 한다
   기간 구간   [from, T]
   기준 날짜   1d = T / 1w = T-7일 / 1m = T-1개월 / 6m = T-6개월 / 1y = T-1년   (config.yaml periods)
   from       기준 날짜 이후 가장 가까운 거래일 (1d는 from = T)
@@ -81,9 +82,20 @@ def prev_trading_day(date: str, nearest: NearestBday) -> str:
     return nearest(fmt(parse(date) - ONE_DAY), True)
 
 
+def is_weekend(date: str) -> bool:
+    """달력 판정 (네트워크 없음). 토·일 = True."""
+    return parse(date).weekday() >= 5
+
+
 def resolve_base_date(run_date: str, nearest: NearestBday) -> str | None:
-    """T = 실행일 기준 직전 거래일. 실행일이 휴장일이면 None (DESIGN.md 2절: 즉시 종료)."""
-    if not is_trading_day(run_date, nearest):
+    """T = 실행일 직전 거래일 = nearest(실행일 − 1일, prev=True). 실행일이 주말이면 None (DESIGN.md 2절).
+
+    실행일 자체가 거래일인지는 **판정하지 않는다**. pykrx `get_nearest_business_day_in_a_week(실행일)` 은 지수 일봉의
+    마지막 행 날짜를 돌려주므로 장 시작 전(07:00 KST cron)에는 실행일 행이 없어 전날이 나오고, 거래일 아침마다
+    휴장일로 오판한다(2026-09-09 실측). 실행일 − 1일 이전 데이터는 아침에도 확정돼 있어 안전하다.
+    평일 휴장일 처리(같은 T 중복 산출 방지)는 main.py 가 `daily/<T>.csv` 존재 여부로 한다.
+    """
+    if is_weekend(run_date):
         return None
     return prev_trading_day(run_date, nearest)
 

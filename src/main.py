@@ -1,16 +1,16 @@
 """처리 흐름 — DESIGN.md 6절.
 
-1. T 결정. 휴장일이면 로그 남기고 종료 (exit 3)
+1. T 결정 (실행일 직전 거래일). 실행일이 주말이거나 daily/<T>.csv 가 이미 있으면 로그 남기고 종료 (exit 3). --force 면 재산출
 2. 시장별 유니버스 로드 → 제외 규칙 적용 (시장당 1회)
 3. for market × period: 구간 계산 → 지수 → 전종목 등락률 → inner join → 초과수익률 → 필터 → 상위/하위 N
 4. 20개 랭킹을 long-format 하나로 통합
 5. outputs/<T>/movers.csv, movers.md 저장 + SQLite upsert (+ 알림은 6단계)
 
-종료코드: 0 전부 성공 / 1 일부·전부 실패(KRX 접근 불가 포함, 실패 목록·원인 분류 보고) / 2 자격증명 없음 / 3 휴장일
+종료코드: 0 전부 성공 / 1 일부·전부 실패(KRX 접근 불가 포함, 실패 목록·원인 분류 보고) / 2 자격증명 없음 / 3 휴장일(주말) 또는 T 이미 산출됨
 한 조합이 실패해도 나머지 조합은 계속 진행하고, 성공한 조합의 결과는 저장한다.
 
 실행: python -m src.main [--base-date YYYYMMDD] [--markets KOSPI,KOSDAQ] [--periods 1d,1w] [--top-n N]
-                          [--config config.yaml] [--cache-dir DIR] [--output-dir DIR] [--sqlite-path FILE] [--no-db] [--daily-dir DIR]
+                          [--config config.yaml] [--cache-dir DIR] [--output-dir DIR] [--sqlite-path FILE] [--no-db] [--daily-dir DIR] [--force]
 실행일 기본값은 KST 날짜(`calendar.today_kst`). cron 이 수십 분 지연돼도 같은 KST 날짜면 T 는 같다.
 """
 from __future__ import annotations
@@ -171,8 +171,12 @@ def run_combo(fetcher: Fetcher, config: Mapping, T: str, market: str, period: st
 
 
 def run(config: Mapping, fetcher: Fetcher, base_date: str, *, markets: list[str] | None = None,
-        periods: list[str] | None = None, top_n: int | None = None) -> RunResult:
-    """DESIGN.md 6절 전체 흐름 (출력 제외). KRXCredentialsError 는 호출자에게 전파한다 (exit 2)."""
+        periods: list[str] | None = None, top_n: int | None = None,
+        already_done: Callable[[str], bool] | None = None, force: bool = False) -> RunResult:
+    """DESIGN.md 6절 전체 흐름 (출력 제외). KRXCredentialsError 는 호출자에게 전파한다 (exit 2).
+
+    already_done(T): 그 T 가 이미 산출됐는지 (main 은 daily/<T>.csv 존재 여부를 넘긴다). True 이고 force 가 아니면 exit 3 로 종료.
+    """
     t0 = time.perf_counter()
     markets = list(markets or config["markets"])
     periods = list(periods or config["periods"])
@@ -188,10 +192,15 @@ def run(config: Mapping, fetcher: Fetcher, base_date: str, *, markets: list[str]
         result.fetch_stats, result.total_sec = dict(fetcher.stats), round(time.perf_counter() - t0, 1)
         return result
     if T is None:
-        result.note = f"{base_date} 는 휴장일 — 종료 (exit {EXIT_HOLIDAY})"
+        result.note = f"{base_date} 는 휴장일(주말) — 종료 (exit {EXIT_HOLIDAY})"
         log.info(result.note)
         result.fetch_stats, result.total_sec = dict(fetcher.stats), round(time.perf_counter() - t0, 1)
         return result
+    if already_done is not None and not force and already_done(T):
+        result.note = f"T={T} 는 이미 산출됨 ({base_date} 는 휴장일이거나 재실행) — 종료 (exit {EXIT_HOLIDAY}). 재산출은 --force"
+        log.info(result.note)
+        result.fetch_stats, result.total_sec = dict(fetcher.stats), round(time.perf_counter() - t0, 1)
+        return result        # result.T 는 None 으로 둔다 → exit_code 3, notify 는 알림 생략
     result.T = T
 
     # 공통 목록 (ETF/ETN) — 실패하면 유니버스를 만들 수 없으므로 전 조합 실패 처리
@@ -271,8 +280,14 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument("--sqlite-path", default=None)
     ap.add_argument("--no-db", action="store_true", help="SQLite 저장 생략 (DB 는 scripts/rebuild_db.py 로 daily CSV 에서 재구성 가능)")
     ap.add_argument("--daily-dir", default=None, help="일별 CSV/MD 사본 디렉터리 (기본 config output.daily_dir, 없으면 생략)")
+    ap.add_argument("--force", action="store_true", help="daily-dir 에 <T>.csv 가 이미 있어도 다시 산출 (재실행용)")
     ap.add_argument("--result-json", default=None, help="실행 요약 JSON 경로 (검증 워크플로용)")
     return ap
+
+
+def daily_dir_of(args, config: Mapping) -> Path | None:
+    d = args.daily_dir or (config.get("output", {}) or {}).get("daily_dir")
+    return Path(d) if d else None
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -283,8 +298,11 @@ def main(argv: list[str] | None = None) -> int:
     periods = args.periods.split(",") if args.periods else None
     fetcher = Fetcher(config, cache_dir=args.cache_dir)
     base_date = args.base_date or today_kst()
+    ddir = daily_dir_of(args, config)
+    already_done = (lambda T: (ddir / f"{T}.csv").exists()) if ddir else None
     try:
-        result = run(config, fetcher, base_date, markets=markets, periods=periods, top_n=args.top_n)
+        result = run(config, fetcher, base_date, markets=markets, periods=periods, top_n=args.top_n,
+                     already_done=already_done, force=args.force)
     except KRXCredentialsError as e:
         print(str(e), file=sys.stderr)
         return EXIT_CREDENTIALS

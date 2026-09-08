@@ -8,7 +8,7 @@ import pytest
 import yaml
 
 from src.calendar import (
-    PeriodWindow, all_windows, is_trading_day, period_window, prev_trading_day,
+    PeriodWindow, all_windows, is_trading_day, is_weekend, period_window, prev_trading_day,
     reference_date, resolve_base_date, subtract_calendar, subtract_months, to_iso,
 )
 
@@ -70,9 +70,33 @@ def test_resolve_base_date_monday_gives_friday():
     assert resolve_base_date("20260907", fake_nearest) == "20260904"
 
 
-@pytest.mark.parametrize("run_date", ["20260905", "20260906", "20260924", "20261005"])
-def test_resolve_base_date_returns_none_on_non_trading_day(run_date):
-    assert resolve_base_date(run_date, fake_nearest) is None
+@pytest.mark.parametrize("run_date", ["20260905", "20260906"])
+def test_resolve_base_date_returns_none_on_weekend(run_date):
+    assert is_weekend(run_date) and resolve_base_date(run_date, fake_nearest) is None
+
+
+@pytest.mark.parametrize("run_date, expected", [
+    ("20260924", "20260923"),   # 추석 연휴 첫날(목) → 직전 거래일 수
+    ("20260925", "20260923"),   # 연휴 둘째 날 → 같은 T (main 이 daily/<T>.csv 로 중복 산출을 막는다)
+    ("20260928", "20260923"),   # 연휴 다음 월요일 07:00 → 아직 23일이 직전 거래일
+    ("20261005", "20261002"),   # 평일 휴장일(월) → 직전 금요일
+])
+def test_resolve_base_date_weekday_holiday_gives_previous_trading_day(run_date, expected):
+    assert not is_weekend(run_date)
+    assert resolve_base_date(run_date, fake_nearest) == expected
+
+
+def test_resolve_base_date_does_not_query_run_date_at_7am():
+    """2026-09-09 07:00 KST 재현: 장 시작 전엔 pykrx nearest(실행일) 이 전날을 돌려준다. 그래도 T 는 실행일 직전 거래일이어야 한다."""
+    asked = []
+
+    def nearest_at_7am(date, prev=True):
+        asked.append((date, prev))
+        if date == "20260909" and prev:
+            return "20260908"           # 실행일 행이 아직 없음 → 지수 마지막 행 = 전날
+        return fake_nearest(date, prev)
+    assert resolve_base_date("20260909", nearest_at_7am) == "20260908"
+    assert ("20260909", True) not in asked      # 실행일 자체를 묻지 않는다
 
 
 # ── 기준 날짜 ────────────────────────────────────────────────────────────

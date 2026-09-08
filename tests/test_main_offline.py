@@ -25,6 +25,7 @@ def env(tmp_path, monkeypatch):
     config["fetch"]["cache_dir"] = str(tmp_path / "cache")
     config["output"]["dir"] = str(tmp_path / "outputs")
     config["output"]["sqlite_path"] = str(tmp_path / "data" / "movers.db")
+    config["output"]["daily_dir"] = str(tmp_path / "daily")     # 리포지토리의 docs/results/daily/ 를 덮어쓰지 않도록
     return tmp_path, config, stock
 
 
@@ -108,8 +109,34 @@ def test_market_preparation_failure_fails_all_periods_of_that_market(env):
 def test_holiday_returns_exit_3_and_writes_nothing(env):
     tmp_path, config, _ = env
     res = m.run(config, Fetcher(config), "20260906")
-    assert res.T is None and res.exit_code == m.EXIT_HOLIDAY and "휴장일" in res.note
+    assert res.T is None and res.exit_code == m.EXIT_HOLIDAY and "휴장일(주말)" in res.note
     assert m.write_outputs(res, config) == {}
+
+
+def test_run_at_7am_does_not_depend_on_run_date_row(env):
+    """2026-09-09 07:00 재현: nearest(실행일) 이 전날을 돌려줘도 T 는 실행일 직전 거래일이고 실행일을 묻지 않는다."""
+    tmp_path, config, stock = env
+    orig = stock.get_nearest_business_day_in_a_week
+
+    def at_7am(date, prev=True):
+        if date == "20260908" and prev:
+            stock.calls.append(("nearest", date, prev))
+            return "20260907"                    # 장 시작 전: 실행일 행 없음 → 전날
+        return orig(date, prev)
+    stock.get_nearest_business_day_in_a_week = at_7am
+    res = m.run(config, Fetcher(config), "20260908", top_n=1)
+    assert res.T == fp.T and res.exit_code == m.EXIT_OK
+    assert ("nearest", "20260908", True) not in stock.calls
+
+
+def test_already_done_dedup_and_force(env):
+    tmp_path, config, _ = env
+    res = m.run(config, Fetcher(config), "20260908", top_n=1, already_done=lambda T: T in {fp.T})
+    assert res.T is None and res.exit_code == m.EXIT_HOLIDAY
+    assert "이미 산출됨" in res.note and "--force" in res.note
+    assert m.write_outputs(res, config) == {}
+    res = m.run(config, Fetcher(config), "20260908", top_n=1, already_done=lambda T: T in {fp.T}, force=True)
+    assert res.T == fp.T and res.exit_code == m.EXIT_OK
 
 
 def test_krx_unavailable_at_T_gives_failure_classification(env, monkeypatch):
@@ -141,15 +168,23 @@ def test_cli_main_end_to_end(env, monkeypatch):
     assert r["T"] == fp.T and r["exit_code"] == 0 and r["n_movers_rows"] == 40 and len(r["combos"]) == 10
     assert r["paths"]["sqlite"].endswith("m.db") and r["paths"]["sqlite_rows"] == 40
     assert "10/10 조합 성공" in buf.getvalue()
-    # 시장·기간 제한과 --no-db
+    # 시장·기간 제한과 --no-db (같은 T 재실행이므로 --force)
     with contextlib.redirect_stdout(io.StringIO()):
         rc = m.main(["--base-date", "20260908", "--config", str(cfg_path), "--markets", "KOSDAQ", "--periods", "1d,1w",
-                     "--no-db", "--result-json", str(result_json)])
+                     "--no-db", "--force", "--result-json", str(result_json)])
     r = json.loads(result_json.read_text(encoding="utf-8"))
     assert rc == 0 and len(r["combos"]) == 2 and "sqlite" not in r["paths"]
-    # 휴장일 → exit 3
+    # 주말 → exit 3
     with contextlib.redirect_stdout(io.StringIO()):
         assert m.main(["--base-date", "20260906", "--config", str(cfg_path)]) == 3
+    # daily_dir 에 <T>.csv 가 생겼으므로 --force 없이 같은 base-date 재실행은 3 (이미 산출됨), --force 면 0
+    assert (tmp_path / "daily" / f"{fp.T}.csv").exists()
+    with contextlib.redirect_stdout(io.StringIO()):
+        assert m.main(["--base-date", "20260908", "--config", str(cfg_path), "--no-db", "--result-json", str(result_json)]) == 3
+    r = json.loads(result_json.read_text(encoding="utf-8"))
+    assert r["T"] is None and "이미 산출됨" in r["note"]
+    with contextlib.redirect_stdout(io.StringIO()):
+        assert m.main(["--base-date", "20260908", "--config", str(cfg_path), "--no-db", "--force", "--result-json", str(result_json)]) == 0
 
 
 def test_daily_dir_copies_and_no_db(env):

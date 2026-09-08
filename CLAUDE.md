@@ -13,7 +13,8 @@ DESIGN.md와 코드가 충돌하면 DESIGN.md가 옳고 코드가 버그다.
 결과 = 2시장 × 5기간 × 2방향 = 20개 랭킹.
 
 ## 2. 반드시 지킬 정의 (DESIGN.md 2절 요약, 원문이 우선)
-- **T**: 실행 시점 기준 직전 거래일. 실행일이 휴장일이면 즉시 종료.
+- **T**: 실행일 직전 거래일 = `nearest(실행일 − 1일, prev=True)`. 실행일 자체가 거래일인지는 판정하지 않는다.
+  종료(exit 3): 실행일이 주말(달력) 또는 `daily/<T>.csv`가 이미 있음(`--force`로 재산출).
 - **기간 구간 `[from, T]`**: 기준 날짜는 1d = T, 1w/1m/6m/1y = T-7일/T-1개월/T-6개월/T-1년.
   from = 기준 날짜 **이후** 가장 가까운 거래일 (1d는 from = T).
 - **기준가**: from 직전 거래일의 종가(수정주가) = `get_market_price_change(from, T)`의 `시가`.
@@ -82,7 +83,8 @@ SQLite 테이블 `movers`는 동일 스키마, PK = `(base_date, market, period,
 3. ✅ fetch.py (캐시·재시도) — 관리종목 KIND 경로는 `validate_fetch` 워크플로 결과로 확정
 4. ✅ calc.py + rank.py — (KOSPI, 1d) `validate_calc` 실측 검증 완료 (2026-09-08, market_ret +4.61%, 801종목)
 5. ✅ report.py + main.py — `validate_main` 실측 10/10 조합 성공 (2026-09-08, 79.5초)
-6. ✅ notify.py + 스케줄러 (`daily.yml`, 07:00 KST) — 첫 cron 실행과 Slack 수신 확인 후 완료 처리
+6. **진행 중** notify.py + 스케줄러 (`daily.yml`, 07:00 KST) — 첫 cron(2026-09-09)이 T 판정 버그로 exit 3 → DESIGN.md 2절 T 정의 수정.
+   수정 후 첫 cron 수신(T=실행일 직전 거래일, Slack 도착) 확인 필요
 7. 백필 (선택)
 
 ## 8. 개발 관례
@@ -105,6 +107,9 @@ SQLite 테이블 `movers`는 동일 스키마, PK = `(base_date, market, period,
 - **DB는 git에 커밋하지 않는다.** 일별 결과 원본은 `docs/results/daily/<T>.csv|.md`(main.py `--daily-dir`)이고,
   `data/movers.db`는 `scripts/rebuild_db.py`로 daily/ 전체에서 재구성하는 파생물이다. 워크플로는 `--no-db`로 돌린다.
 - 실행일 기본값은 `calendar.today_kst()`(KST 날짜). `date.today()`를 쓰지 않는다 (UTC 러너에서 T가 하루 밀림).
+- T 판정에서 **실행일 당일 데이터를 조회하지 않는다**: pykrx `nearest(실행일)`은 지수 일봉 마지막 행이라 07:00 cron에서는 전날이 나와 거래일을 휴장일로 오판한다(2026-09-09).
+  중복 산출은 `run(already_done=...)`(main은 `daily/<T>.csv` 존재)로 막고 `--force`로 푼다.
+- 테스트 `env` 픽스처는 `output.daily_dir`도 tmp로 돌린다. 리포지토리의 `docs/results/daily/`(실제 결과 원본)를 테스트가 덮어쓰면 안 된다.
 - `src/notify.py`: `SLACK_WEBHOOK_URL` 없으면 경고 후 생략, 휴장일은 생략, 실패는 원인 분류를 담아 발송. 테스트는 `http_post`·`env` 주입.
 - `src/fetch.py`의 `Fetcher`가 유일한 네트워크 진입점이다. pykrx는 `_pykrx()`에서 지연 import하고 `KRX_ID/KRX_PW` 없음은
   `KRXCredentialsError`, 접속·재시도 실패는 `KRXUnavailableError`. 캐시는 `data/cache/<날짜>/<엔드포인트>__<인자>.json`.
