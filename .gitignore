@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+.env
+data/
+outputs/
+docs/stage1_result.json
+docs/stage1_run.log
