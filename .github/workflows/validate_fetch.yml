@@ -1,4 +1,4 @@
-name: validate_universe
+name: validate_fetch
 
 on:
   workflow_dispatch:
@@ -26,7 +26,7 @@ jobs:
           pip install -r requirements.txt
       - name: Unit tests (offline)
         run: python -m pytest -q
-      - name: Run validate_universe
+      - name: Run validate_fetch
         id: run
         env:
           KRX_ID: ${{ secrets.KRX_ID }}
@@ -35,7 +35,7 @@ jobs:
         run: |
           mkdir -p docs/results
           set +e
-          python scripts/validate_universe.py $([ -n "${{ inputs.base_date }}" ] && echo --base-date "${{ inputs.base_date }}") 2>&1 | tee docs/results/validate_universe.log
+          python scripts/validate_fetch.py $([ -n "${{ inputs.base_date }}" ] && echo --base-date "${{ inputs.base_date }}") 2>&1 | tee docs/results/validate_fetch.log
           rc=${PIPESTATUS[0]}
           set -e
           echo "exit_code=$rc" >> "$GITHUB_OUTPUT"
@@ -44,18 +44,18 @@ jobs:
         if: always()
         run: |
           {
-            echo "## validate_universe (exit ${{ steps.run.outputs.exit_code }})"
+            echo "## validate_fetch (exit ${{ steps.run.outputs.exit_code }})"
             echo
-            python scripts/summarize_result.py universe || echo "_결과 JSON 없음 — 로그 artifact 참고_"
+            python scripts/summarize_result.py fetch || echo "_결과 JSON 없음 — 로그 artifact 참고_"
           } >> "$GITHUB_STEP_SUMMARY"
       - name: Upload results
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: validate_universe-${{ github.run_number }}
+          name: validate_fetch-${{ github.run_number }}
           path: |
             docs/results/*.json
-            docs/results/validate_universe.log
+            docs/results/validate_fetch.log
           if-no-files-found: warn
           retention-days: 30
       - name: Commit results to docs/results
@@ -67,7 +67,7 @@ jobs:
           if git diff --cached --quiet; then
             echo "no result changes"
           else
-            git commit -m "results: validate_universe run ${{ github.run_number }} (exit ${{ steps.run.outputs.exit_code }})"
+            git commit -m "results: validate_fetch run ${{ github.run_number }} (exit ${{ steps.run.outputs.exit_code }})"
             git pull --rebase origin "${{ github.ref_name }}"
             git push origin "HEAD:${{ github.ref_name }}"
           fi

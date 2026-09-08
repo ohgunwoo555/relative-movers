@@ -22,6 +22,20 @@
 - (c) `kind_admin_page.status == 200` 이고 `contains_keyword` 가 true 이면 스크래핑 후보로 유지.
 - KOSPI 관리종목이 (a)(b) 어디에도 없으면: (c) 스크래퍼를 3단계 fetch.py 에 구현하거나, 그때까지 경고 유지.
 
-## 결정 (검증 후 기입)
-- 채택 소스: _(미정)_
-- fetch.py 함수: `get_administrative_tickers(T) -> set[str] | None` (None = 조회 실패/미지원 → universe.py 가 경고)
+## 실측 (2026-09-08 `validate_universe`, T = 2026-09-07)
+
+| 소스 | KOSPI | KOSDAQ |
+|---|---|---|
+| (a) 전종목시세 소속부 | **전부 빈 값** (`{'': 943}`) → 판별 불가 | `관리종목(소속부없음)` **129** 종목 (그 외 중견 511 / 우량 466 / 벤처 340 / 기술성장 255 / SPAC 65 / 투자주의환기 41 / 외국기업 15) |
+| (b) 전종목기본정보 소속부 | 요약에 미출력 — `docs/results/universe_result.json` 의 `basic_info` 참고. KOSPI 는 (a)와 같은 컬럼 체계라 빈 값일 가능성이 높음 | (a)와 동일 체계 |
+| (c) KIND 관리종목 페이지 (GET) | HTTP 200, 1,472 바이트, 키워드 없음 → **GET 은 껍데기 페이지**. 데이터는 POST(`method=searchAdminIssueSub`, `forward=adminissue_sub`)로 받아야 함 | 동일 |
+
+## 결정
+- **KOSDAQ: (a) 전종목시세 소속부** 채택. 티커 목록과 같은 요청이라 추가 호출 0회, T 시점 스냅샷.
+- **KOSPI: KIND POST 스크래핑을 1순위로 시도**하고, 실패하면 **None → universe.py 가 경고 후 미적용**.
+  KIND 가 동작하면 KOSDAQ 도 KIND 를 우선 사용하고 소속부는 폴백으로 둔다(공식 목록이 우선).
+- 구현: `src/fetch.py` `Fetcher.administrative_tickers(T, market, listed) -> set[str] | None`
+  1. `_kind_administrative_codes(T)`: `POST kind.krx.co.kr/investwarn/adminissue.do` → `companysummary_open('XXXXXX')` 패턴으로 종목코드 추출 → T 상장 목록과 교집합. 응답 캐시.
+  2. 실패·0건이면 KOSDAQ 은 `administrative_from_sect(listed)`, KOSPI 는 None (WARNING).
+- 검증: `validate_fetch` 워크플로가 KIND 파싱 건수, 시장별 교집합, KOSDAQ 소속부 129와의 겹침을 `docs/results/fetch_result.json` 에 남긴다.
+  KIND 가 동작하지 않으면 다음 후보는 KRX 정보데이터시스템의 관리종목 화면(bld 미확인)이며, 그때까지 KOSPI 관리종목 필터는 미적용 상태가 경고로 드러난다.

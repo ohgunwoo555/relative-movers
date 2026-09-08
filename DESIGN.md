@@ -34,6 +34,13 @@ todate를 "이전 가장 가까운 거래일"로 보정하고 시작일 **기준
 | 신규상장(시작일 데이터 없음) | 항상 제외 | (고정) |
 | 기간 평균 거래대금 하한 | 0 (미적용) | `filters.min_avg_trading_value` |
 
+판별 규칙 (2단계 실측으로 확정, docs/universe_validation.md):
+- 우선주: 종목코드 끝자리 ≠ '0' (우선주·기타 종류주·신주인수권증권 등 비보통주 전부) 또는 종목명이 `N우`/`우B`/`우C`/`우(전환)`/`우(신형)`로 끝남.
+  단순 '…우' 접미사는 보통주 오탐(성우·에코글로우·이오플로우)이 있어 쓰지 않는다
+- 스팩: 종목명에 "스팩" 포함
+- 관리종목: KOSDAQ은 KRX 전종목시세 소속부 `관리종목`, KOSPI는 KIND 관리종목 현황(POST) 스크래핑. 소스가 없으면 경고 후 미적용 (docs/administrative_issue.md)
+- 제외 목록이 제공되지 않은 필터는 조용히 건너뛰지 않고 경고 로그와 결과 `warnings`에 남긴다
+
 ## 4. 데이터 소스
 1순위 `pykrx`:
 - `get_market_price_change(fromdate, todate, market)` — 기간 내 전 종목 시가/종가/등락률
@@ -47,7 +54,8 @@ todate를 "이전 가장 가까운 거래일"로 보정하고 시작일 **기준
   config.yaml·코드에 자격증명을 넣지 않는다. 세션은 1시간 만료, pykrx가 자동 재로그인한다.
 - **지연 import**: pykrx는 import 시점에 로그인하며 KRX에 닿지 못하면 import 자체가 예외를 던진다.
   `fetch.py`는 pykrx를 함수 안에서 import하고 예외를 잡아 "KRX 접근 불가"로 처리한다(main.py가 트레이스백으로 죽지 않게).
-- **래퍼 sleep**: pykrx 내부에는 호출 간 sleep이 없다. `fetch.py`에서 호출 간 `sleep(1)`, 실패 시 3회 재시도, 응답은 `data/cache/`에 일자별 저장.
+- **래퍼 sleep**: pykrx 내부에는 호출 간 sleep이 없다. `fetch.py`에서 호출 간 `sleep(1)`, 실패 시 3회 재시도(백오프),
+  HTTP 타임아웃 20초(최소 15초, 1단계 실측 첫 호출 6~8초). 응답은 `data/cache/<날짜>/<엔드포인트>__<인자>.json`에 저장하고 재실행 시 캐시 우선.
   `get_market_price_change` 1회는 KRX 요청 4회(거래일 보정 2 + 조회 2)를 발생시킨다.
 - `get_market_price_change(fromdate, todate, market, adjusted=True)`: `adjusted` 기본값 True. 반환 `시가` = 시작일 기준가(2절 정의).
   **1단계 검증 결과 액면분할 반영 확인(ADJUSTED, 포스코스틸리온 10:1)** → 예외 경로는 당장 불필요. fetch.py에 함수만 두고 미사용

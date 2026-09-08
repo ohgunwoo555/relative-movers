@@ -37,6 +37,8 @@ LISTED = {
     "058430": "포스코스틸리온",
     "900250": "크리스탈신소재",       # 외국기업, 코드 0 종료
     "012345": "코드끝자리5보통",       # 규칙 충돌 검증용 가짜: 코드로는 우선주, 이름은 아님
+    "458650": "성우",                 # 보통주인데 이름이 '우' 로 끝남 — 제외되면 안 된다
+    "294090": "이오플로우",
 }
 SECT = {"005930": "", "437780": "SPAC", "058430": "관리종목", "377300": ""}
 
@@ -70,9 +72,12 @@ def test_is_preferred_ticker(ticker, expected):
 
 
 @pytest.mark.parametrize("name, expected", [
-    ("삼성전자우", True), ("현대차2우B", True), ("현대차3우B", True), ("CJ4우(전환)", True),
-    ("LG화학우", True), ("한화3우B", True), ("SK케미칼우", True), ("두산우C", True), ("우리금융지주", False),
-    ("삼성전자", False), ("대우건설", False), ("현대우", True), ("포스코스틸리온", False), ("삼성스팩8호", False),
+    # 강한 접미사만 True
+    ("현대차2우B", True), ("현대차3우B", True), ("CJ4우(전환)", True), ("한화3우B", True), ("두산우C", True),
+    ("현대차2우", True), ("SK케미칼우(신형)", True),
+    # 단순 '…우' 는 코드 규칙에 맡긴다 (보통주 오탐 방지: 성우·에코글로우·이오플로우 — 2026-09-08 실측)
+    ("삼성전자우", False), ("LG화학우", False), ("성우", False), ("에코글로우", False), ("이오플로우", False),
+    ("우리금융지주", False), ("삼성전자", False), ("대우건설", False), ("포스코스틸리온", False), ("삼성스팩8호", False),
 ])
 def test_is_preferred_name(name, expected):
     assert is_preferred_name(name) is expected
@@ -82,9 +87,11 @@ def test_preferred_mask_is_union_of_rules(listed):
     m = preferred_mask(listed)
     # ETN 코드(500001)도 끝자리가 0이 아니라 코드 규칙에 걸린다 — 실제 파이프라인에서는 ETN 단계에서 먼저 빠진다
     assert set(listed.index[m]) == {"005935", "005385", "005387", "005389", "00104K", "051915", "00088K", "500001", "012345"}
+    assert not m["458650"] and not m["294090"]           # '…우' 로 끝나는 보통주는 남는다
     bd = preferred_rule_breakdown(listed)
-    assert list(bd.index) == ["500001", "012345"]       # 코드 규칙만 걸린 종목이 보고된다
-    assert bool(bd.loc["012345", "by_ticker"]) and not bool(bd.loc["012345", "by_name"])
+    # 코드 규칙만 걸린 종목(단순 '우' 우선주, ETN, 가짜)이 보고된다. 이름 규칙만 걸린 종목은 없어야 한다
+    assert list(bd.index) == ["005935", "005385", "051915", "500001", "012345"]
+    assert not bd["by_name"].any()
 
 
 # ── 스팩 ─────────────────────────────────────────────────────────────────
@@ -104,12 +111,12 @@ def test_administrative_from_sect(listed):
 def test_build_universe_all_filters(listed):
     res = build_universe(listed, "KOSPI", CONFIG, etf_tickers={"069500"}, etn_tickers={"500001"},
                          administrative_tickers={"058430"})
-    assert res.tickers == ["005930", "005380", "051910", "000880", "377300", "900250"]
-    assert res.steps == [("listed", 19), ("-etf", 18), ("-etn", 17), ("-spac", 15),
-                         ("-preferred", 7), ("-administrative", 6)]
+    assert res.tickers == ["005930", "005380", "051910", "000880", "377300", "900250", "458650", "294090"]
+    assert res.steps == [("listed", 21), ("-etf", 20), ("-etn", 19), ("-spac", 17),
+                         ("-preferred", 9), ("-administrative", 8)]
     assert res.removed["-preferred"] == ["005935", "005385", "005387", "005389", "00104K", "051915", "00088K", "012345"]
     assert res.warnings == []
-    assert res.summary().startswith("[KOSPI] listed=19 → -etf=18")
+    assert res.summary().startswith("[KOSPI] listed=21 → -etf=20")
 
 
 def test_build_universe_warns_when_administrative_source_missing(listed, caplog):
@@ -117,7 +124,7 @@ def test_build_universe_warns_when_administrative_source_missing(listed, caplog)
         res = build_universe(listed, "KOSDAQ", CONFIG, etf_tickers={"069500"}, etn_tickers={"500001"},
                              administrative_tickers=None)
     assert "058430" in res.tickers                       # 미적용 → 관리종목이 남아 있다
-    assert res.steps[-1] == ("-administrative(미적용)", 7)
+    assert res.steps[-1] == ("-administrative(미적용)", 9)
     assert len(res.warnings) == 1 and "exclude.administrative=true" in res.warnings[0]
     assert any("administrative" in r.message and r.levelno == logging.WARNING for r in caplog.records)
 
@@ -125,7 +132,7 @@ def test_build_universe_warns_when_administrative_source_missing(listed, caplog)
 def test_build_universe_warns_when_etn_list_missing(listed, caplog):
     with caplog.at_level(logging.WARNING, logger="src.universe"):
         res = build_universe(listed, "KOSPI", CONFIG, etf_tickers=set(), etn_tickers=None, administrative_tickers=set())
-    assert ("-etn(미적용)", 19) in res.steps
+    assert ("-etn(미적용)", 21) in res.steps
     assert res.removed.get("-etn") is None
     assert "500001" in res.removed["-preferred"]          # ETN 단계가 빠져도 코드 끝자리 규칙에서 걸린다
     assert any("exclude.etn=true" in w for w in res.warnings)
@@ -134,7 +141,7 @@ def test_build_universe_warns_when_etn_list_missing(listed, caplog):
 def test_build_universe_respects_config_flags(listed):
     cfg = {"exclude": {"etn": False, "spac": False, "preferred": False, "administrative": False}}
     res = build_universe(listed, "KOSPI", cfg, etf_tickers={"069500"})
-    assert res.steps == [("listed", 19), ("-etf", 18)]   # ETF 만 항상 제외
+    assert res.steps == [("listed", 21), ("-etf", 20)]   # ETF 만 항상 제외
     assert res.warnings == []
 
 

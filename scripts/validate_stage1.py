@@ -16,7 +16,7 @@
     python scripts/validate_stage1.py [--split-ticker 058430 --split-name 포스코스틸리온
                                        --split-date 20260423 --market KOSPI] [--skip-1y]
 
-출력: stdout 표 + docs/stage1_result.json
+출력: stdout 표 + docs/results/stage1_result.json (+ stage1_result_<T>.json)
 종료코드: 0 전부 성공 / 1 일부 실패 / 2 자격증명 없음
 
 pykrx 는 호출 간 sleep 을 넣지 않으므로 여기서 DESIGN.md 규칙(sleep 1s, 3회 재시도)을 그대로 적용한다.
@@ -35,7 +35,8 @@ SLEEP_SEC = 1
 MAX_RETRIES = 3
 ADJUST_TOL_PP = 1.0  # 수정주가 수익률과의 허용 오차 (%p)
 ROOT = Path(__file__).resolve().parent.parent
-RESULT_JSON = ROOT / "docs" / "stage1_result.json"
+RESULTS_DIR = ROOT / "docs" / "results"
+RESULT_JSON = RESULTS_DIR / "stage1_result.json"
 
 results: list[dict] = []
 _stock = None  # 지연 import 된 pykrx.stock
@@ -351,7 +352,10 @@ def _finish(summary: dict, total_t0: float) -> int:
     summary["total_sec"] = round(time.perf_counter() - total_t0, 1)
     summary["calls"] = results
     RESULT_JSON.parent.mkdir(parents=True, exist_ok=True)
-    RESULT_JSON.write_text(json.dumps(summary, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
+    text = json.dumps(summary, ensure_ascii=False, indent=2, default=str)
+    RESULT_JSON.write_text(text, encoding="utf-8")
+    if summary.get("T"):
+        (RESULT_JSON.parent / f"stage1_result_{summary['T']}.json").write_text(text, encoding="utf-8")
     print("\n| call | ok | sec | rows |\n|---|---|---|---|")
     for r in results:
         print(f"| {r['call']} | {r['ok']} | {r['sec']} | {r['rows']} |")

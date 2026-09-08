@@ -100,10 +100,10 @@ export KRX_PW='<비밀번호>'
 python scripts/validate_stage1.py                      # 기본: 포스코스틸리온 058430, 2026-04-23
 # python scripts/validate_stage1.py --split-ticker 290560 --split-name 신시웨이 --split-date 20260223 --market KOSDAQ
 ```
-- 출력: 함수별 소요시간·행수 표(stdout) + `docs/stage1_result.json` (gitignore 대상. 요약값은 이 문서 4절에 옮겨 적는다)
+- 출력: 함수별 소요시간·행수 표(stdout) + `docs/results/stage1_result.json` (gitignore 대상. 요약값은 이 문서 4절에 옮겨 적는다)
 - `--skip-1y` 로 1년치 전종목 등락률 호출을 생략할 수 있다(가장 오래 걸리는 호출).
 - 스크립트는 DESIGN.md 규칙(호출 간 sleep 1s, 실패 시 3회 재시도)을 그대로 적용하며, 부분 실패 시 exit 1, 자격증명 없음 시 exit 2.
-- 더미 자격증명으로 실행해 실패 경로(import 시 로그인 실패 → 기록 → `docs/stage1_result.json` 저장 → exit 1)가 정상 동작함은 확인했다.
+- 더미 자격증명으로 실행해 실패 경로(import 시 로그인 실패 → 기록 → `docs/results/stage1_result.json` 저장 → exit 1)가 정상 동작함은 확인했다.
 
 ## 4. 실측 결과 — GitHub Actions `validate_stage1` (2026-09-08, `skip_1y=true`)
 

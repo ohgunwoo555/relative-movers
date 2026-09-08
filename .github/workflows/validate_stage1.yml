@@ -1,32 +1,16 @@
 name: validate_stage1
 
-# DESIGN.md 10절 1단계 검증을 GitHub Actions 러너(해외 IP)에서 수동 실행한다.
-# - pykrx 5종 함수 동작·소요시간, 액면분할 수정주가 반영 여부
-# - KRX 해외 IP 차단 여부(DESIGN.md 9절) 확인을 겸한다
 on:
   workflow_dispatch:
     inputs:
-      split_ticker:
-        description: "액면분할 종목코드 (기본 포스코스틸리온)"
-        default: "058430"
-        required: false
-      split_name:
-        description: "종목명 (종목코드 교차확인용)"
-        default: "포스코스틸리온"
-        required: false
-      split_date:
-        description: "분할 신주 변경상장일 YYYYMMDD"
-        default: "20260423"
-        required: false
-      market:
-        description: "분할 종목 시장 (KOSPI/KOSDAQ)"
-        default: "KOSPI"
-        required: false
-      skip_1y:
-        description: "1년치 전종목 등락률 호출 생략"
-        type: boolean
-        default: false
-        required: false
+      split_ticker: {description: "액면분할 종목코드 (기본 포스코스틸리온)", default: "058430", required: false}
+      split_name: {description: "종목명 (종목코드 교차확인용)", default: "포스코스틸리온", required: false}
+      split_date: {description: "분할 신주 변경상장일 YYYYMMDD", default: "20260423", required: false}
+      market: {description: "분할 종목 시장 (KOSPI/KOSDAQ)", default: "KOSPI", required: false}
+      skip_1y: {description: "1년치 전종목 등락률 호출 생략", type: boolean, default: false, required: false}
+
+permissions:
+  contents: write
 
 jobs:
   validate:
@@ -34,70 +18,60 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
-
+        with:
+          ref: ${{ github.ref }}
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
           cache: pip
-
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-
-      - name: Run stage-1 validation
+      - name: Unit tests (offline)
+        run: python -m pytest -q
+      - name: Run validate_stage1
         id: run
         env:
           KRX_ID: ${{ secrets.KRX_ID }}
           KRX_PW: ${{ secrets.KRX_PW }}
           PYTHONUNBUFFERED: "1"
         run: |
-          mkdir -p docs
+          mkdir -p docs/results
           set +e
-          python scripts/validate_stage1.py \
-            --split-ticker "${{ inputs.split_ticker }}" \
-            --split-name "${{ inputs.split_name }}" \
-            --split-date "${{ inputs.split_date }}" \
-            --market "${{ inputs.market }}" \
-            $([ "${{ inputs.skip_1y }}" = "true" ] && echo --skip-1y) \
-            2>&1 | tee docs/stage1_run.log
+          python scripts/validate_stage1.py --split-ticker "${{ inputs.split_ticker }}" --split-name "${{ inputs.split_name }}" --split-date "${{ inputs.split_date }}" --market "${{ inputs.market }}" $([ "${{ inputs.skip_1y }}" = "true" ] && echo --skip-1y) 2>&1 | tee docs/results/validate_stage1.log
           rc=${PIPESTATUS[0]}
           set -e
           echo "exit_code=$rc" >> "$GITHUB_OUTPUT"
           exit $rc
-
       - name: Summarize
         if: always()
         run: |
           {
-            echo "## stage-1 validation (exit ${{ steps.run.outputs.exit_code }})"
+            echo "## validate_stage1 (exit ${{ steps.run.outputs.exit_code }})"
             echo
-            if [ -f docs/stage1_result.json ]; then
-              python - <<'PY'
-          import json
-          r = json.load(open("docs/stage1_result.json", encoding="utf-8"))
-          print(f"- T = {r.get('T')} · total {r.get('total_sec')}s · pykrx {r.get('pykrx_version')}")
-          sc = r.get("split_check") or {}
-          print(f"- split verdict: **{sc.get('verdict')}** ({sc.get('ticker')} {sc.get('name_resolved') or ''})")
-          print(f"- 1d definition check: **{r.get('definition_check', {}).get('verdict')}**")
-          print()
-          print("| call | ok | sec | rows |")
-          print("|---|---|---|---|")
-          for c in r.get("calls", []):
-              print(f"| {c['call']} | {c['ok']} | {c['sec']} | {c['rows']} |")
-          PY
-            else
-              echo "_stage1_result.json 없음 — 로그 artifact 참고_"
-            fi
+            python scripts/summarize_result.py stage1 || echo "_결과 JSON 없음 — 로그 artifact 참고_"
           } >> "$GITHUB_STEP_SUMMARY"
-
       - name: Upload results
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: stage1-validation-${{ github.run_number }}
+          name: validate_stage1-${{ github.run_number }}
           path: |
-            docs/stage1_result.json
-            docs/stage1_run.log
+            docs/results/*.json
+            docs/results/validate_stage1.log
           if-no-files-found: warn
           retention-days: 30
+      - name: Commit results to docs/results
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/results/*.json
+          if git diff --cached --quiet; then
+            echo "no result changes"
+          else
+            git commit -m "results: validate_stage1 run ${{ github.run_number }} (exit ${{ steps.run.outputs.exit_code }})"
+            git pull --rebase origin "${{ github.ref_name }}"
+            git push origin "HEAD:${{ github.ref_name }}"
+          fi

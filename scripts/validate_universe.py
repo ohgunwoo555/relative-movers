@@ -2,14 +2,14 @@
 """2단계 검증: T 시점 KOSPI/KOSDAQ 유니버스를 실제로 구성해 단계별 종목 수를 출력한다.
 
 - pykrx 로 T 시점 티커·종목명(전종목시세, 소속부 포함), ETF/ETN 목록을 받아 `src.universe.build_universe` 적용
-- 1단계 실측 파일(docs/stage1_result.json)이 있으면 listed/ETF 개수를 대조
+- 1단계 실측 파일(docs/results/stage1_result.json)이 있으면 listed/ETF 개수를 대조
 - 우선주 규칙(코드 끝자리 vs 종목명) 충돌 종목과 전종목기본정보(주식종류=우선주) 대조 결과 출력
-- 관리종목 판별 소스 조사: (a) 전종목시세 소속부 (b) 전종목기본정보 소속부 (c) KIND 관리종목 페이지 접근 여부
+- 관리종목 판별 소스 조사: (a) 전종목시세 소속부 (b) 전종목기본정보 소속부 (c) KIND 관리종목 페이지 접근 여부 (GET; POST 파싱은 3단계 fetch.py/validate_fetch)
 
 사용:
     export KRX_ID=...; export KRX_PW=...
     python scripts/validate_universe.py [--base-date YYYYMMDD] [--stage1-json docs/stage1_result.json]
-출력: stdout + docs/universe_result.json
+출력: stdout + docs/results/universe_result.json (+ universe_result_<T>.json)
 종료코드: 0 성공 / 1 일부 실패 / 2 자격증명 없음
 """
 from __future__ import annotations
@@ -33,7 +33,8 @@ from src.universe import (  # noqa: E402
 
 SLEEP_SEC = 1
 MAX_RETRIES = 3
-RESULT_JSON = ROOT / "docs" / "universe_result.json"
+RESULTS_DIR = ROOT / "docs" / "results"
+RESULT_JSON = RESULTS_DIR / "universe_result.json"
 KIND_ADMIN_URL = "https://kind.krx.co.kr/investwarn/adminissue.do?method=searchAdminIssueMain"
 
 results: list[dict] = []
@@ -67,7 +68,7 @@ def value_counts(series, top: int = 15) -> dict:
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--base-date", default=dt.date.today().strftime("%Y%m%d"))
-    ap.add_argument("--stage1-json", default=str(ROOT / "docs" / "stage1_result.json"))
+    ap.add_argument("--stage1-json", default=str(RESULTS_DIR / "stage1_result.json"))
     ap.add_argument("--config", default=str(ROOT / "config.yaml"))
     args = ap.parse_args()
 
@@ -188,7 +189,10 @@ def _finish(summary: dict, total_t0: float) -> int:
     summary["total_sec"] = round(time.perf_counter() - total_t0, 1)
     summary["calls"] = results
     RESULT_JSON.parent.mkdir(parents=True, exist_ok=True)
-    RESULT_JSON.write_text(json.dumps(summary, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
+    text = json.dumps(summary, ensure_ascii=False, indent=2, default=str)
+    RESULT_JSON.write_text(text, encoding="utf-8")
+    if summary.get("T"):
+        (RESULT_JSON.parent / f"universe_result_{summary['T']}.json").write_text(text, encoding="utf-8")
     print("\n=== 요약 ===")
     for mkt, m in summary.get("markets", {}).items():
         if "steps" in m:

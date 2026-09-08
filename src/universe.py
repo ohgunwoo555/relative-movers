@@ -7,7 +7,7 @@
 | ETF | pykrx `get_etf_ticker_list(T)` 목록 (fetch.py 가 넘겨줌) | 항상 제외 |
 | ETN | pykrx `get_etn_ticker_list(T)` 목록 | `exclude.etn` |
 | 스팩 | 종목명에 "스팩" 포함 | `exclude.spac` |
-| 우선주 | 종목코드 끝자리 != '0' **또는** 종목명 접미사(우, 우B, 2우B, 우(전환) …) | `exclude.preferred` |
+| 우선주 | 종목코드 끝자리 != '0' (우선주·기타 종류주·신주인수권증권 등 비보통주 전부) **또는** 종목명의 강한 접미사(N우, 우B, 우C, 우(전환), 우(신형)) | `exclude.preferred` |
 | 관리종목 | 호출자가 넘기는 티커 집합. 없으면 **경고 로그 후 미적용** (조용히 넘어가지 않음) | `exclude.administrative` |
 | 거래정지 | 기간 중 거래량 0 — `suspended_mask` 로 calc 단계에서 적용 (여기서는 인터페이스만) | `exclude.suspended` |
 | 신규상장 | 기간 수익률 프레임과 T 유니버스의 inner join 으로 자동 탈락 | 항상 제외 |
@@ -27,8 +27,10 @@ import pandas as pd
 
 log = logging.getLogger(__name__)
 
-# 종목명 접미사 규칙: 삼성전자우 / 현대차2우B / CJ4우(전환) / 미래에셋증권2우B / 한화3우B / SK케미칼우 / 우(신형)
-PREFERRED_NAME_RE = re.compile(r"\d?우(?:B|C)?(?:\(전환\)|\(신형\))?$")
+# 종목명 접미사 규칙 — '강한' 접미사만 본다: 현대차2우B / CJ4우(전환) / 한화3우B / 두산우C / 우(신형).
+# 단순 '…우' 는 성우·에코글로우·이오플로우 같은 보통주를 오탐하므로(2026-09-08 validate_universe 실측) 제외한다.
+# 단순 '…우' 우선주(삼성전자우 005935 등)는 코드 끝자리 규칙이 전부 잡는다(실측: official_not_ours 없음).
+PREFERRED_NAME_RE = re.compile(r"(?:\d우B?|우[BC]|우\((?:전환|신형)\))$")
 SPAC_KEYWORD = "스팩"
 ADMINISTRATIVE_SECT_KEYWORD = "관리종목"
 
@@ -59,7 +61,11 @@ def listed_frame(ticker_to_name: Mapping[str, str] | pd.Series,
 # 개별 판별 규칙 (순수 함수)
 # ──────────────────────────────────────────────────────────────────────────
 def is_preferred_ticker(ticker: str) -> bool:
-    """KRX 종목코드 끝자리: '0' = 보통주, 그 외(5/7/9/K/L/M …) = 우선주·기타 종류주."""
+    """KRX 종목코드 끝자리: '0' = 보통주, 그 외(5/7/9/K/L …) = 우선주·기타 종류주·신주인수권증권(WL) 등 비보통주.
+
+    실측(2026-09-08): 공식 주식종류 '우선주' 는 전부 이 규칙에 포함되고, 추가로 K/WL 접미 코드 13종(비보통주)이 걸린다.
+    유니버스는 보통주만 대상으로 하므로 이들을 함께 제외하는 것이 의도에 맞는다.
+    """
     return len(ticker) > 0 and ticker[-1] != "0"
 
 

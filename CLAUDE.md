@@ -79,7 +79,7 @@ SQLite 테이블 `movers`는 동일 스키마, PK = `(base_date, market, period,
 단계를 건너뛰지 않는다. 현재 단계와 다음 단계는 아래를 갱신한다.
 1. ✅ 환경·데이터 검증 (pykrx 5종 호출, 액면분할 검증, 소요시간) — 결과: `docs/stage1_validation.md`
 2. ✅ calendar.py + universe.py + 테스트 (관리종목 소스는 `validate_universe` 워크플로 결과로 확정 — docs/administrative_issue.md)
-3. fetch.py (캐시·재시도)
+3. ✅ fetch.py (캐시·재시도) — 관리종목 KIND 경로는 `validate_fetch` 워크플로 결과로 확정
 4. calc.py + rank.py — (KOSPI, 1d) 한 조합 먼저 끝까지, 이후 루프 확장
 5. report.py + main.py — 20개 랭킹 통합 출력, SQLite 저장
 6. notify.py + 스케줄러
@@ -91,11 +91,17 @@ SQLite 테이블 `movers`는 동일 스키마, PK = `(base_date, market, period,
   (`src/calendar.py`가 표준 라이브러리 `calendar`를 가리므로). `pytest.ini`의 `pythonpath = .`가 이를 보장한다.
 - 거래일 조회는 `src/calendar.py`에 주입하는 콜러블(`NearestBday`)로 추상화한다. 테스트는 가짜 달력, 운영은 fetch.py 래퍼.
 - 유니버스(`src/universe.py`)는 네트워크를 모른다. fetch.py가 `listed_frame`(티커→종목명, 소속부)과 ETF/ETN/관리종목 집합을 넘긴다.
-  우선주 = 코드 끝자리 != '0' 또는 종목명 접미사(우/우B/2우B/우(전환)…), 스팩 = 종목명 "스팩" 포함.
+  우선주 = 코드 끝자리 != '0'(비보통주 전부) 또는 강한 이름 접미사(N우/우B/우C/우(전환)/우(신형)). 단순 '…우'는 보통주 오탐이라 쓰지 않는다.
+  스팩 = 종목명 "스팩" 포함. 관리종목 = KOSDAQ 소속부, KOSPI KIND POST(실패 시 None→경고).
   `exclude.*`가 켜져 있는데 목록이 None이면 **경고 로그 + `warnings` 기록 + 미적용**. 조용히 건너뛰지 않는다.
 - 기간 수익률 프레임은 계산 전에 반드시 `inner_join_universe`로 T 유니버스와 결합한다(상장폐지 -100 행·신규상장 제거).
   거래정지는 `suspended_mask`(구간 거래량 0)로 calc 단계에서 제외.
-- git: 별도 브랜치 없이 `main`에 직접 커밋·푸시한다(사용자 지시, 2026-09-08).
+- `src/fetch.py`의 `Fetcher`가 유일한 네트워크 진입점이다. pykrx는 `_pykrx()`에서 지연 import하고 `KRX_ID/KRX_PW` 없음은
+  `KRXCredentialsError`, 접속·재시도 실패는 `KRXUnavailableError`. 캐시는 `data/cache/<날짜>/<엔드포인트>__<인자>.json`.
+  테스트는 `pykrx_ns`, `sleep_fn`, `http_post`, `env`를 주입한다(tests/test_fetch.py 참고).
+- 검증 결과 JSON은 `docs/results/<kind>_result.json`(최신) + `<kind>_result_<T>.json`(이력)에 남기고 워크플로가 main에 커밋한다.
+  다음 검증 스크립트는 이 파일로 개수를 자동 대조한다. 로그(`*.log`)는 artifact에만.
+- git: 별도 브랜치 없이 `main`에 직접 커밋·푸시한다(사용자 지시, 2026-09-08). 워크플로 봇 커밋과 충돌하면 `git pull --rebase`.
 - 테스트는 `tests/`에 pytest. 네트워크 호출은 캐시 픽스처로 대체하고 실제 KRX 호출 테스트는 별도 마크.
 - 날짜는 내부적으로 `YYYYMMDD` 문자열(pykrx 규약)로 통일하고, 출력 스키마에서는 `YYYY-MM-DD`.
 - 엣지 케이스(신규상장·거래정지·상장폐지·액면분할)는 DESIGN.md 8절을 따른다.

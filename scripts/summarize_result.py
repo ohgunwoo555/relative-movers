@@ -1,0 +1,61 @@
+#!/usr/bin/env python3
+"""docs/results/<kind>_result.json → GitHub Job Summary 용 마크다운 (워크플로 Summarize 스텝에서 호출)."""
+from __future__ import annotations
+
+import json
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+RESULTS = ROOT / "docs" / "results"
+
+
+def calls_table(r: dict) -> None:
+    print("\n| call | ok | sec | rows |\n|---|---|---|---|")
+    for c in r.get("calls", []):
+        print(f"| {c['call']} | {c['ok']} | {c['sec']} | {c['rows']} |")
+
+
+def main(kind: str) -> int:
+    path = RESULTS / f"{kind}_result.json"
+    if not path.exists():
+        return 1
+    r = json.loads(path.read_text(encoding="utf-8"))
+    print(f"- T = {r.get('T')} · total {r.get('total_sec')}s" + (f" · {r['note']}" if r.get("note") else ""))
+    if kind == "stage1":
+        sc = r.get("split_check") or {}
+        print(f"- split verdict: **{sc.get('verdict')}** ({sc.get('ticker')} {sc.get('name_resolved') or ''})")
+        print(f"- 1d definition check: **{(r.get('definition_check') or {}).get('verdict')}**")
+        calls_table(r)
+    elif kind == "universe":
+        print(f"- ETF {r.get('n_etf')} · ETN {r.get('n_etn')} · stage1 compare: `{r.get('stage1_compare')}`")
+        for mkt, m in (r.get("markets") or {}).items():
+            if "steps" in m:
+                print(f"- **{mkt}**: " + " → ".join(f"{k}={v}" for k, v in m["steps"]))
+                print(f"  - 소속부: `{m.get('sect_value_counts')}`")
+                print(f"  - 우선주 규칙 충돌: `{m.get('preferred_rule_conflicts', [])[:10]}`")
+                if m.get("preferred_vs_basic_info"):
+                    print(f"  - 기본정보 대조: `{m['preferred_vs_basic_info']}`")
+                for w in m.get("warnings", []):
+                    print(f"  - ⚠️ {w}")
+        bi = r.get("basic_info") or {}
+        for mkt, b in bi.items():
+            print(f"- 기본정보 {mkt}: 소속부 `{b.get('SECT_TP_NM')}` · 주식종류 `{b.get('KIND_STKCERT_TP_NM')}`")
+        print(f"- KIND 관리종목 페이지(GET): `{r.get('kind_admin_page')}`")
+    elif kind == "fetch":
+        print(f"- ETF {r.get('n_etf')} · ETN {r.get('n_etn')} · windows `{r.get('windows')}`")
+        for mkt, m in (r.get("markets") or {}).items():
+            if "steps" in m:
+                print(f"- **{mkt}**: " + " → ".join(f"{k}={v}" for k, v in m["steps"]))
+                print(f"  - 관리종목: `{m.get('administrative')}`")
+                print(f"  - 1w price_change rows {m.get('n_price_change_1w')} (상장폐지 -100 행 {m.get('n_delisted_rows')})")
+                for w in m.get("warnings", []):
+                    print(f"  - ⚠️ {w}")
+        print(f"- cache check: `{r.get('cache_check')}` · stats `{r.get('fetch_stats')}`")
+        print(f"- compare previous: `{r.get('compare_previous')}`")
+        calls_table(r)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1] if len(sys.argv) > 1 else "stage1"))
