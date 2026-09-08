@@ -4,7 +4,7 @@
   "note": null,
   "top_n": 20,
   "exit_code": 0,
-  "total_sec": 79.5,
+  "total_sec": 87.5,
   "combos": [
     {
       "market": "KOSPI",
@@ -38,9 +38,9 @@
       "error": null,
       "error_class": null,
       "timings": {
-        "window": 1.27,
-        "index_ohlcv": 7.69,
-        "price_change": 2.05,
+        "window": 1.31,
+        "index_ohlcv": 10.75,
+        "price_change": 2.44,
         "calc": 0.01,
         "rank": 0.01
       },
@@ -78,9 +78,9 @@
       "error": null,
       "error_class": null,
       "timings": {
-        "window": 2.42,
-        "index_ohlcv": 1.21,
-        "price_change": 2.16,
+        "window": 2.51,
+        "index_ohlcv": 1.24,
+        "price_change": 2.22,
         "calc": 0.01,
         "rank": 0.01
       },
@@ -118,9 +118,9 @@
       "error": null,
       "error_class": null,
       "timings": {
-        "window": 2.55,
-        "index_ohlcv": 1.84,
-        "price_change": 2.44,
+        "window": 2.51,
+        "index_ohlcv": 1.27,
+        "price_change": 2.45,
         "calc": 0.01,
         "rank": 0.01
       },
@@ -158,9 +158,9 @@
       "error": null,
       "error_class": null,
       "timings": {
-        "window": 2.54,
-        "index_ohlcv": 1.23,
-        "price_change": 3.43,
+        "window": 2.87,
+        "index_ohlcv": 1.56,
+        "price_change": 3.78,
         "calc": 0.01,
         "rank": 0.01
       },
@@ -198,9 +198,9 @@
       "error": null,
       "error_class": null,
       "timings": {
-        "window": 2.41,
-        "index_ohlcv": 1.32,
-        "price_change": 4.08,
+        "window": 2.53,
+        "index_ohlcv": 1.35,
+        "price_change": 5.17,
         "calc": 0.01,
         "rank": 0.01
       },
@@ -239,8 +239,8 @@
       "error_class": null,
       "timings": {
         "window": 0.0,
-        "index_ohlcv": 1.23,
-        "price_change": 2.21,
+        "index_ohlcv": 1.24,
+        "price_change": 2.18,
         "calc": 0.01,
         "rank": 0.01
       },
@@ -279,8 +279,8 @@
       "error_class": null,
       "timings": {
         "window": 0.0,
-        "index_ohlcv": 1.22,
-        "price_change": 2.6,
+        "index_ohlcv": 1.24,
+        "price_change": 2.24,
         "calc": 0.01,
         "rank": 0.01
       },
@@ -319,8 +319,8 @@
       "error_class": null,
       "timings": {
         "window": 0.0,
-        "index_ohlcv": 1.3,
-        "price_change": 2.67,
+        "index_ohlcv": 1.27,
+        "price_change": 2.52,
         "calc": 0.01,
         "rank": 0.01
       },
@@ -359,8 +359,8 @@
       "error_class": null,
       "timings": {
         "window": 0.0,
-        "index_ohlcv": 1.3,
-        "price_change": 3.9,
+        "index_ohlcv": 1.24,
+        "price_change": 3.96,
         "calc": 0.01,
         "rank": 0.01
       },
@@ -399,8 +399,8 @@
       "error_class": null,
       "timings": {
         "window": 0.0,
-        "index_ohlcv": 1.24,
-        "price_change": 5.73,
+        "index_ohlcv": 1.28,
+        "price_change": 5.17,
         "calc": 0.01,
         "rank": 0.01
       },
@@ -475,15 +475,15 @@
   ],
   "failure": null,
   "timings": {
-    "resolve_base_date": 4.68,
-    "etf_tickers": 2.59,
+    "resolve_base_date": 5.04,
+    "etf_tickers": 3.38,
     "etn_tickers": 1.0,
-    "KOSPI/listed": 1.36,
-    "KOSPI/administrative": 2.34,
-    "KOSPI/market_cap": 1.47,
-    "KOSDAQ/listed": 1.8,
+    "KOSPI/listed": 1.45,
+    "KOSPI/administrative": 4.19,
+    "KOSPI/market_cap": 1.56,
+    "KOSDAQ/listed": 2.68,
     "KOSDAQ/administrative": 0.0,
-    "KOSDAQ/market_cap": 1.97
+    "KOSDAQ/market_cap": 1.69
   },
   "fetch_stats": {
     "network_calls": 38,
@@ -494,8 +494,8 @@
   "paths": {
     "csv": "outputs/20260907/movers.csv",
     "md": "outputs/20260907/movers.md",
-    "sqlite": "docs/results/movers.db",
-    "sqlite_rows": 400
+    "daily_csv": "docs/results/daily/20260907.csv",
+    "daily_md": "docs/results/daily/20260907.md"
   },
-  "run_at": "2026-09-08T04:39:53"
+  "run_at": "2026-09-08T05:24:44"
 }
