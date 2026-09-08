@@ -86,14 +86,18 @@ class Fake전종목시세:
         return pd.DataFrame(rows, columns=["ISU_SRT_CD", "ISU_ABBRV", "SECT_TP_NM"])
 
 
-def install_fake_pykrx(monkeypatch):
+def install_fake_pykrx(monkeypatch, authenticated: bool = True):
     core = types.ModuleType("pykrx.website.krx.market.core"); core.전종목시세 = Fake전종목시세
     market = types.ModuleType("pykrx.website.krx.market"); market.core = core
     krx = types.ModuleType("pykrx.website.krx"); krx.market = market
-    website = types.ModuleType("pykrx.website"); website.krx = krx
+    auth = types.ModuleType("pykrx.website.comm.auth")
+    auth.get_auth_session = lambda: types.SimpleNamespace(is_authenticated=True) if authenticated else None
+    comm = types.ModuleType("pykrx.website.comm"); comm.auth = auth
+    website = types.ModuleType("pykrx.website"); website.krx = krx; website.comm = comm
     pk = types.ModuleType("pykrx"); pk.stock = FakeStock(); pk.website = website; pk.__version__ = "fake"
     for name, mod in [("pykrx", pk), ("pykrx.website", website), ("pykrx.website.krx", krx),
-                      ("pykrx.website.krx.market", market), ("pykrx.website.krx.market.core", core)]:
+                      ("pykrx.website.krx.market", market), ("pykrx.website.krx.market.core", core),
+                      ("pykrx.website.comm", comm), ("pykrx.website.comm.auth", auth)]:
         monkeypatch.setitem(sys.modules, name, mod)
     monkeypatch.setitem(sys.modules, "pykrx.stock", pk.stock)
 
@@ -168,3 +172,34 @@ def test_second_run_uses_cache(run):
     run("--market", "KOSPI", "--period", "1w", "--base-date", "20260908")
     rc, _, r = run("--market", "KOSPI", "--period", "1w", "--base-date", "20260908")
     assert rc == 0 and r["fetch_stats"]["network_calls"] == 0 and r["fetch_stats"]["cache_hits"] >= 8
+
+
+def test_unauthenticated_session_exits_1_with_classification(tmp_path, monkeypatch):
+    """pykrx 가 자격증명 오류를 print 만 하고 넘어가는 경우: 세션 미인증 → 재시도 후 exit 1, failure.classification=자격증명."""
+    install_fake_pykrx(monkeypatch, authenticated=False)
+    monkeypatch.setenv("KRX_ID", "x"); monkeypatch.setenv("KRX_PW", "bad")
+    import src.fetch as fetch_mod
+    monkeypatch.setattr(fetch_mod, "install_default_timeout", lambda *_: None)
+    monkeypatch.setattr(fetch_mod, "purge_pykrx_modules", lambda: 0)           # 가짜 모듈 유지
+    monkeypatch.setattr(fetch_mod.time, "sleep", lambda *_: None)
+    monkeypatch.setattr(fetch_mod, "diagnose_krx_failure",
+                        lambda exc, **kw: {"classification": fetch_mod.classify_krx_failure(exc, 200, ""), "http_status": 200,
+                                           "body_head": "", "body_source": None, "exception": str(exc), "probe_error": None})
+    mod = load(SCRIPT, "run_one_under_test_auth")
+    mod.ROOT = tmp_path; mod.RESULTS_DIR = tmp_path / "results"
+    (tmp_path / "config.yaml").write_text((ROOT / "config.yaml").read_text(encoding="utf-8"), encoding="utf-8")
+    monkeypatch.setattr(sys, "argv", ["run_one", "--config", str(tmp_path / "config.yaml"), "--cache-dir", str(tmp_path / "cache"),
+                                      "--market", "KOSPI", "--period", "1d", "--base-date", "20260908"])
+    with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+        rc = mod.main()
+    r = json.loads((tmp_path / "results" / "calc_result.json").read_text(encoding="utf-8"))
+    assert rc == 1 and r["exit_code"] == 1
+    assert r["failure"]["classification"] == "자격증명" and "3회 실패" in r["error"]
+    assert r["fetch_stats"]["retries"] == 3
+    # Summary 에 실패 블록이 맨 위에 나온다
+    sr = load(SUMMARIZE, "summarize_under_test_auth"); sr.RESULTS = tmp_path / "results"
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf):
+        sr.main("calc")
+    out = buf.getvalue()
+    assert out.startswith("### ❌ KRX 접근 실패 — 분류: **자격증명**")

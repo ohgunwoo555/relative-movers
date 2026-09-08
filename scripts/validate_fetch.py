@@ -69,7 +69,9 @@ def main() -> int:
         print(str(e), file=sys.stderr)
         return 2
     except KRXUnavailableError as e:
-        print(f"KRX 접근 불가: {e}", file=sys.stderr)
+        summary["error"] = str(e)
+        summary["failure"] = {"classification": e.classification, **e.diagnosis}
+        print(f"KRX 접근 불가 [{e.classification}]: {e}", file=sys.stderr)
         return _finish(summary, fetcher, total_t0, T=None)
     if T is None:
         T = fetcher.nearest(args.base_date, True)

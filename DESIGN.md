@@ -119,7 +119,9 @@ SQLite 테이블 `movers`는 동일 스키마. PK = (base_date, market, period, 
 ## 8. 엣지 케이스
 - 신규상장: 제외 / 거래정지: 옵션 제외 / 상장폐지: T 목록 기준이라 자연 탈락
 - 액면분할·병합: 수정주가 필요 (4절 참고)
-- KRX 응답 실패: 재시도 후 실패 시 알림, 캐시로 재실행 시 중복 호출 방지
+- KRX 응답 실패: 재시도 후 실패 시 알림, 캐시로 재실행 시 중복 호출 방지.
+  pykrx import(로그인) 실패도 재시도·백오프 대상(`fetch.import_retry_backoff_sec`). 최종 실패 시 원인을
+  **점검 / 차단 / 자격증명 / unknown** 으로 분류하고 HTTP 상태·응답 본문 앞 300자를 로그·결과 JSON(`failure`)·Summary에 남긴 뒤 exit 1
 
 ## 9. 스케줄링
 - **확정: 1안 GitHub Actions cron** (매일 07:00 KST = `0 22 * * *` UTC).

@@ -29,6 +29,7 @@ filters:
 fetch:
   sleep_sec: 1
   max_retries: 3
+  import_retry_backoff_sec: 10   # pykrx import(KRX 로그인) 실패 시 재시도 간격(초) × 시도 횟수
   cache_dir: data/cache
 
 output:

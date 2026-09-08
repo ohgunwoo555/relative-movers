@@ -1,7 +1,7 @@
 """pykrx 래퍼 — 캐시·재시도·sleep (DESIGN.md 4절).
 
 책임
-  - pykrx 지연 import. `KRX_ID`/`KRX_PW` 미설정이면 `KRXCredentialsError`, KRX 접속·로그인 실패면 `KRXUnavailableError`
+  - pykrx 지연 import. `KRX_ID`/`KRX_PW` 미설정이면 `KRXCredentialsError`, KRX 접속·로그인 실패면 `KRXUnavailableError`\n    (import 실패도 재시도·백오프 대상. 실패 원인을 점검/차단/자격증명/unknown 으로 분류해 메시지와 `.diagnosis` 에 담는다)
   - 호출 간 `sleep(config.fetch.sleep_sec)`, 실패 시 `config.fetch.max_retries` 회 재시도(백오프), HTTP 타임아웃 기본 20초
     (1단계 실측: 엔드포인트별 첫 호출 6~8초)
   - 응답을 `config.fetch.cache_dir/<날짜>/<엔드포인트>__<인자>.json` 에 저장, 재실행 시 캐시 우선
@@ -35,12 +35,96 @@ KIND_CODE_RE = re.compile(r"companysummary_open\('([0-9A-Z]{6})'\)")
 DEFAULT_TIMEOUT_SEC = 20
 
 
+KRX_LOGIN_PAGE = "https://data.krx.co.kr/contents/MDC/COMS/client/MDCCOMS001.cmd"
+PROBE_UA = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"}
+FAILURE_CLASSES = ("점검", "차단", "자격증명", "unknown")
+DEFAULT_IMPORT_BACKOFF_SEC = 10
+
+
 class KRXCredentialsError(RuntimeError):
     """KRX_ID / KRX_PW 환경변수가 없다 (pykrx >= 1.2 는 KRX Data Marketplace 로그인 필수)."""
 
 
 class KRXUnavailableError(RuntimeError):
-    """KRX 접속·로그인·조회가 재시도 후에도 실패했다."""
+    """KRX 접속·로그인·조회가 재시도 후에도 실패했다. `.diagnosis` 에 분류·HTTP 상태·응답 앞부분이 담긴다."""
+
+    def __init__(self, message: str, diagnosis: dict | None = None):
+        super().__init__(message)
+        self.diagnosis = diagnosis or {}
+
+    @property
+    def classification(self) -> str:
+        return self.diagnosis.get("classification", "unknown")
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# 실패 진단: KRX 가 JSON 대신 HTML 을 주거나 접속이 끊겼을 때 "점검 / 차단 / 자격증명 / unknown" 으로 분류
+# ──────────────────────────────────────────────────────────────────────────
+_NETWORK_EXC = ("proxyerror", "connectionerror", "connecttimeout", "readtimeout", "timeout", "sslerror",
+                "max retries exceeded", "connection refused", "connection reset", "remotedisconnected")
+_MAINT_KW = ("점검", "maintenance", "서비스 이용에 불편", "일시적으로", "서비스가 원활", "temporarily unavailable", "service unavailable")
+_BLOCK_KW = ("access denied", "차단", "blocked", "forbidden", "not allowed", "captcha", "bot detected", "request rejected")
+_CRED_KW = ("자격 증명", "credential", "비밀번호", "아이디 또는", "로그인 실패", "login failed", "세션 미인증",
+            "mdccoms001", "login.jsp", "로그인", "login")
+
+
+def body_head(text: str | None, n: int = 300) -> str:
+    return re.sub(r"\s+", " ", (text or "")).strip()[:n]
+
+
+def classify_krx_failure(exc: BaseException | None, status: int | None = None, body: str | None = None) -> str:
+    """우선순위: 네트워크 예외/HTTP 403·407·429 → 차단, 5xx/점검 문구 → 점검, 로그인 관련 문구 → 자격증명, 그 외 unknown."""
+    msg = f"{type(exc).__name__}: {exc}".lower() if exc is not None else ""
+    b = (body or "").lower()
+    if isinstance(exc, KRXCredentialsError):
+        return "자격증명"
+    if any(k in msg for k in _NETWORK_EXC) or status in (403, 407, 429):
+        return "차단"
+    if status in (500, 502, 503, 504) or any(k in b for k in _MAINT_KW) or any(k in msg for k in ("점검", "maintenance")):
+        return "점검"
+    if any(k in b for k in _BLOCK_KW):
+        return "차단"
+    if any(k in b for k in _CRED_KW) or any(k in msg for k in ("자격 증명", "credential", "세션 미인증", "로그인 실패")):
+        return "자격증명"
+    return "unknown"
+
+
+def diagnose_krx_failure(exc: BaseException, *, http_get: Callable[..., Any] | None = None,
+                         timeout: float = DEFAULT_TIMEOUT_SEC, probe: bool = True) -> dict:
+    """예외(JSONDecodeError 면 `.doc` 에 응답 본문)와 로그인 페이지 GET 프로브로 진단 딕셔너리를 만든다."""
+    body = getattr(exc, "doc", None) or ""
+    body_source = "exception.doc" if body else None
+    status: int | None = None
+    probe_error = None
+    if probe:
+        try:
+            get = http_get
+            if get is None:
+                import requests
+                get = requests.get
+            r = get(KRX_LOGIN_PAGE, headers=PROBE_UA, timeout=timeout)
+            status = getattr(r, "status_code", None)
+            if not body:
+                body, body_source = getattr(r, "text", "") or "", "probe:login_page"
+        except Exception as pe:  # noqa: BLE001
+            probe_error = f"{type(pe).__name__}: {str(pe)[:200]}"
+    return {"classification": classify_krx_failure(exc, status, body), "http_status": status,
+            "body_head": body_head(body), "body_source": body_source,
+            "exception": f"{type(exc).__name__}: {str(exc)[:200]}", "probe_error": probe_error}
+
+
+def format_diagnosis(d: dict) -> str:
+    return (f"[{d.get('classification', 'unknown')}] HTTP {d.get('http_status')} | {d.get('exception')} | "
+            f"body({d.get('body_source')}): {d.get('body_head') or '-'}")
+
+
+def purge_pykrx_modules() -> int:
+    """import 실패 후 재시도를 위해 부분 로드된 pykrx 모듈을 제거한다."""
+    import sys
+    names = [n for n in sys.modules if n == "pykrx" or n.startswith("pykrx.")]
+    for n in names:
+        del sys.modules[n]
+    return len(names)
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -116,10 +200,13 @@ class Fetcher:
 
     def __init__(self, config: Mapping, *, cache_dir: str | Path | None = None,
                  pykrx_ns: Any = None, sleep_fn: Callable[[float], None] | None = None,
-                 http_post: Callable[..., Any] | None = None, env: Mapping[str, str] | None = None):
+                 http_post: Callable[..., Any] | None = None, http_get: Callable[..., Any] | None = None,
+                 env: Mapping[str, str] | None = None):
         fcfg = dict(config.get("fetch", {}) or {})
         self.sleep_sec = float(fcfg.get("sleep_sec", 1))
         self.max_retries = int(fcfg.get("max_retries", 3))
+        self.import_backoff_sec = float(fcfg.get("import_retry_backoff_sec", DEFAULT_IMPORT_BACKOFF_SEC))
+        self._http_get = http_get
         self.timeout_sec = max(float(fcfg.get("timeout_sec", DEFAULT_TIMEOUT_SEC)), 15.0)
         self.cache_dir = Path(cache_dir or fcfg.get("cache_dir", "data/cache"))
         self._ns = pykrx_ns
@@ -129,7 +216,26 @@ class Fetcher:
         self.stats = {"network_calls": 0, "cache_hits": 0, "retries": 0}
         self.kind_debug: dict = {}   # 마지막 KIND 관리종목 응답 진단 (validate_fetch 가 기록)
 
-    # ── pykrx 지연 import ────────────────────────────────────────────────
+    # ── pykrx 지연 import (재시도·백오프·진단) ─────────────────────────────
+    def _import_pykrx(self):
+        """실제 import. pykrx 는 import 시점에 KRX 로그인을 수행하며 HTML 응답이면 JSONDecodeError 를 던진다."""
+        import types
+        from pykrx import stock
+        from pykrx.website.comm import auth
+        from pykrx.website.krx.market import core
+        self._check_authenticated(auth)
+        return types.SimpleNamespace(stock=stock, core=core)
+
+    @staticmethod
+    def _check_authenticated(auth_module) -> None:
+        """pykrx 는 로그인 실패(자격증명 오류 등)를 print 만 하고 넘어간다. 세션이 미인증이면 여기서 실패로 만든다."""
+        sess = auth_module.get_auth_session()
+        if sess is None or not getattr(sess, "is_authenticated", False):
+            raise RuntimeError("KRX 로그인 실패: 세션 미인증 (자격 증명을 확인하세요)")
+
+    def _diagnose(self, exc: BaseException) -> dict:
+        return diagnose_krx_failure(exc, http_get=self._http_get, timeout=self.timeout_sec)
+
     def _pykrx(self):
         if self._ns is not None:
             return self._ns
@@ -137,14 +243,20 @@ class Fetcher:
             raise KRXCredentialsError(
                 "KRX_ID / KRX_PW 환경변수가 없습니다. pykrx>=1.2 는 KRX Data Marketplace 로그인이 필요합니다 (DESIGN.md 4절·9절).")
         install_default_timeout(self.timeout_sec)
-        try:
-            import types
-            from pykrx import stock
-            from pykrx.website.krx.market import core
-        except Exception as e:  # noqa: BLE001  (import 시점 로그인 실패 포함)
-            raise KRXUnavailableError(f"pykrx import/KRX 로그인 실패: {type(e).__name__}: {e}") from e
-        self._ns = types.SimpleNamespace(stock=stock, core=core)
-        return self._ns
+        diag: dict = {}
+        for attempt in range(1, self.max_retries + 1):
+            try:
+                self._ns = self._import_pykrx()      # 로그인은 stats.network_calls 에 세지 않는다 (데이터 호출 통계만)
+                return self._ns
+            except Exception as e:  # noqa: BLE001  (JSONDecodeError = KRX 가 HTML 응답, 네트워크 예외 등)
+                self.stats["retries"] += 1
+                diag = self._diagnose(e)
+                log.warning("pykrx import/KRX 로그인 실패 (attempt %d/%d): %s", attempt, self.max_retries, format_diagnosis(diag))
+                purge_pykrx_modules()
+                if attempt < self.max_retries:
+                    self._sleep(self.import_backoff_sec * attempt)
+        raise KRXUnavailableError(
+            f"pykrx import/KRX 로그인 {self.max_retries}회 실패 {format_diagnosis(diag)}", diagnosis=diag)
 
     # ── 캐시 + 재시도 ────────────────────────────────────────────────────
     def _cache_path(self, date_key: str, endpoint: str, *args: Any) -> Path:
@@ -178,7 +290,9 @@ class Fetcher:
                 log.warning("%s 실패 (attempt %d/%d): %s: %s", label, attempt, self.max_retries, type(e).__name__, str(e)[:200])
                 if attempt < self.max_retries:
                     self._sleep(self.sleep_sec * attempt)
-        raise KRXUnavailableError(f"{label} {self.max_retries}회 실패: {type(last).__name__}: {str(last)[:300]}") from last
+        diag = self._diagnose(last)
+        log.error("%s %d회 실패 — %s", label, self.max_retries, format_diagnosis(diag))
+        raise KRXUnavailableError(f"{label} {self.max_retries}회 실패 {format_diagnosis(diag)}", diagnosis=diag) from last
 
     # ── 거래일 ───────────────────────────────────────────────────────────
     def nearest_business_day(self, date: str, prev: bool = True) -> str:

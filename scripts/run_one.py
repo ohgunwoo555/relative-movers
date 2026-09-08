@@ -6,7 +6,7 @@
 
 출력: stdout 마크다운 표 + docs/results/calc_result.json (+ calc_result_<T>_<market>_<period>.json)
       + outputs/<T>/movers_<market>_<period>.csv (gitignore)
-종료코드: 0 성공 / 1 실패 / 2 자격증명 없음 / 3 휴장일(T 없음)
+종료코드: 0 성공 / 1 실패(KRX 접근 불가 — 결과 JSON `failure.classification` 에 점검/차단/자격증명/unknown) / 2 자격증명 없음 / 3 휴장일(T 없음)
 
 주: 2시장×5기간 루프와 통합 출력은 5단계 main.py 가 맡는다. 여기의 오케스트레이션은 그때 main.py 로 옮긴다.
 """
@@ -97,7 +97,8 @@ def main() -> int:
         return 2
     except KRXUnavailableError as e:
         summary["error"] = str(e)
-        print(f"KRX 접근 불가: {e}", file=sys.stderr)
+        summary["failure"] = {"classification": e.classification, **e.diagnosis}
+        print(f"KRX 접근 불가 [{e.classification}]: {e}", file=sys.stderr)
         return _finish(summary, fetcher, t0, exit_code=1)
 
     summary["calc"] = {"n_rows": int(len(calc)), "market_ret": float(calc["market_ret"].iloc[0]) if len(calc) else None,

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import datetime as dt
 import logging
+import sys
 import types
 
 import pandas as pd
@@ -10,7 +11,8 @@ import pytest
 
 from src.calendar import resolve_base_date
 from src.fetch import (
-    KRXCredentialsError, KRXUnavailableError, Fetcher, _from_jsonable, _to_jsonable, install_default_timeout,
+    KRXCredentialsError, KRXUnavailableError, Fetcher, _from_jsonable, _to_jsonable, classify_krx_failure,
+    diagnose_krx_failure, install_default_timeout, purge_pykrx_modules,
 )
 
 CONFIG = {"fetch": {"sleep_sec": 1, "max_retries": 3, "cache_dir": "unused"}}
@@ -243,3 +245,140 @@ def test_naver_fallback_kept_but_callable(tmp_path):
     f, stock, _ = make_fetcher(tmp_path)
     df = f.ohlcv_adjusted_naver("20260904", "20260907", "058430")
     assert stock.calls[-1] == ("ohlcv", "20260904", "20260907", "058430", True) and len(df) == 2
+
+
+# ── 실패 진단 / 분류 ─────────────────────────────────────────────────────
+import json as _json
+
+
+def json_err(doc: str):
+    return _json.JSONDecodeError("Expecting value", doc, 0)
+
+
+def fake_get_factory(status=200, text=""):
+    def get(url, headers=None, timeout=None):
+        fake_get_factory.last = {"url": url, "timeout": timeout}
+        return types.SimpleNamespace(status_code=status, text=text)
+    return get
+
+
+@pytest.mark.parametrize("exc, status, body, expected", [
+    (ConnectionError("HTTPSConnectionPool: Max retries exceeded (ProxyError 403)"), None, "", "차단"),
+    (json_err("<html>x</html>"), 403, "<html>Access Denied</html>", "차단"),
+    (json_err("<html>x</html>"), 200, "<html>Request Rejected</html>", "차단"),
+    (json_err("<html>x</html>"), 503, "", "점검"),
+    (json_err("<html>x</html>"), 200, "<html>시스템 점검 중입니다. 서비스 이용에 불편을 드려 죄송합니다</html>", "점검"),
+    (json_err("<html>x</html>"), 200, "<html><title>KRX 로그인</title><form action='login.jsp'>", "자격증명"),
+    (RuntimeError("KRX 로그인 실패: 세션 미인증 (자격 증명을 확인하세요)"), 200, "", "자격증명"),
+    (KRXCredentialsError("no env"), None, "", "자격증명"),
+    (json_err("<html>x</html>"), 200, "<html>hello</html>", "unknown"),
+    (RuntimeError("점검 중"), None, "", "점검"),
+])
+def test_classify_krx_failure(exc, status, body, expected):
+    assert classify_krx_failure(exc, status, body) == expected
+
+
+def test_diagnose_uses_exception_doc_and_probe_status():
+    exc = json_err("<html>  시스템   점검 안내  </html>")
+    d = diagnose_krx_failure(exc, http_get=fake_get_factory(503, "<html>maintenance</html>"), timeout=20)
+    assert d["classification"] == "점검" and d["http_status"] == 503
+    assert d["body_head"] == "<html> 시스템 점검 안내 </html>" and d["body_source"] == "exception.doc"
+    assert fake_get_factory.last["timeout"] == 20 and d["probe_error"] is None
+
+
+def test_diagnose_falls_back_to_probe_body_and_records_probe_error():
+    d = diagnose_krx_failure(RuntimeError("boom"), http_get=fake_get_factory(200, "<html>Access Denied</html>"))
+    assert d["classification"] == "차단" and d["body_source"] == "probe:login_page"
+
+    def bad_get(url, headers=None, timeout=None):
+        raise ConnectionError("proxy 403")
+    d = diagnose_krx_failure(RuntimeError("boom"), http_get=bad_get)
+    assert d["probe_error"].startswith("ConnectionError") and d["http_status"] is None
+    assert d["classification"] == "unknown"                    # 예외 자체엔 단서가 없음
+    d = diagnose_krx_failure(RuntimeError("boom"), probe=False)
+    assert d["http_status"] is None and d["body_source"] is None
+
+
+def make_import_fetcher(tmp_path, monkeypatch, outcomes, http_get, sleep_log):
+    """outcomes: 각 _import_pykrx 호출의 결과 (예외 인스턴스면 raise, 아니면 반환)."""
+    monkeypatch.setattr("src.fetch.install_default_timeout", lambda *_: None)
+    f = Fetcher({"fetch": {"sleep_sec": 1, "max_retries": 3, "import_retry_backoff_sec": 10}},
+                cache_dir=tmp_path, sleep_fn=sleep_log.append, http_get=http_get, env={"KRX_ID": "x", "KRX_PW": "y"})
+    calls = []
+
+    def fake_import():
+        calls.append(1)
+        out = outcomes[min(len(calls), len(outcomes)) - 1]
+        if isinstance(out, BaseException):
+            raise out
+        return out
+    f._import_pykrx = fake_import
+    return f, calls
+
+
+def test_import_retries_with_backoff_then_succeeds(tmp_path, monkeypatch, caplog):
+    ns = types.SimpleNamespace(stock=FakeStock(), core=None)
+    sleeps: list = []
+    f, calls = make_import_fetcher(tmp_path, monkeypatch, [json_err("<html>점검</html>"), json_err("<html>점검</html>"), ns],
+                                   fake_get_factory(503, ""), sleeps)
+    with caplog.at_level(logging.WARNING, logger="src.fetch"):
+        assert f._pykrx() is ns
+    assert len(calls) == 3 and sleeps == [10.0, 20.0]           # import 백오프 10s × attempt
+    assert f.stats["retries"] == 2 and f.stats["network_calls"] == 0   # import 는 데이터 호출 통계에 넣지 않는다
+    assert sum("[점검]" in r.message and "attempt" in r.message for r in caplog.records) == 2
+    assert f._pykrx() is ns and len(calls) == 3                 # 이후 호출은 캐시된 네임스페이스
+
+
+def test_import_failure_raises_with_classification(tmp_path, monkeypatch):
+    sleeps: list = []
+    exc = json_err("<html><title>KRX Data Marketplace</title> 서비스 점검 중입니다 </html>")
+    f, calls = make_import_fetcher(tmp_path, monkeypatch, [exc], fake_get_factory(200, ""), sleeps)
+    with pytest.raises(KRXUnavailableError) as ei:
+        f.nearest_business_day("20260907")
+    e = ei.value
+    assert len(calls) == 3 and sleeps == [10.0, 20.0]
+    assert e.classification == "점검" and "[점검]" in str(e) and "3회 실패" in str(e)
+    assert e.diagnosis["http_status"] == 200 and "서비스 점검 중입니다" in e.diagnosis["body_head"]
+    assert "JSONDecodeError" in e.diagnosis["exception"]
+
+
+def test_import_blocked_classification_from_network_exception(tmp_path, monkeypatch):
+    sleeps: list = []
+    exc = ConnectionError("HTTPSConnectionPool(host='data.krx.co.kr'): Max retries exceeded (ProxyError 403)")
+    f, _ = make_import_fetcher(tmp_path, monkeypatch, [exc], fake_get_factory(200, ""), sleeps)
+    with pytest.raises(KRXUnavailableError) as ei:
+        f.etf_tickers("20260907")
+    assert ei.value.classification == "차단"
+
+
+def test_check_authenticated_rejects_unauthenticated_session():
+    auth_none = types.SimpleNamespace(get_auth_session=lambda: None)
+    with pytest.raises(RuntimeError, match="세션 미인증"):
+        Fetcher._check_authenticated(auth_none)
+    auth_bad = types.SimpleNamespace(get_auth_session=lambda: types.SimpleNamespace(is_authenticated=False))
+    with pytest.raises(RuntimeError):
+        Fetcher._check_authenticated(auth_bad)
+    auth_ok = types.SimpleNamespace(get_auth_session=lambda: types.SimpleNamespace(is_authenticated=True))
+    Fetcher._check_authenticated(auth_ok)
+
+
+def test_data_call_json_error_is_classified(tmp_path):
+    stock = FakeStock()
+
+    def html_response(date, prev=True):
+        raise json_err("<html><form action='/contents/MDC/COMS/client/login.jsp'>로그인</form></html>")
+    stock.get_nearest_business_day_in_a_week = html_response
+    ns = types.SimpleNamespace(stock=stock, core=None)
+    f = Fetcher(CONFIG, cache_dir=tmp_path, pykrx_ns=ns, sleep_fn=lambda *_: None,
+                http_get=fake_get_factory(200, ""), env={"KRX_ID": "x", "KRX_PW": "y"})
+    with pytest.raises(KRXUnavailableError) as ei:
+        f.nearest_business_day("20260907")
+    assert ei.value.classification == "자격증명" and "login.jsp" in ei.value.diagnosis["body_head"]
+
+
+def test_purge_pykrx_modules(monkeypatch):
+    monkeypatch.setitem(sys.modules, "pykrx", types.ModuleType("pykrx"))
+    monkeypatch.setitem(sys.modules, "pykrx.website.comm.webio", types.ModuleType("pykrx.website.comm.webio"))
+    monkeypatch.setitem(sys.modules, "pykrxlike", types.ModuleType("pykrxlike"))
+    assert purge_pykrx_modules() == 2
+    assert "pykrx" not in sys.modules and "pykrxlike" in sys.modules

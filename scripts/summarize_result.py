@@ -21,6 +21,15 @@ def main(kind: str) -> int:
     if not path.exists():
         return 1
     r = json.loads(path.read_text(encoding="utf-8"))
+    if r.get("failure") or r.get("error"):
+        f = r.get("failure") or {}
+        print(f"### ❌ KRX 접근 실패 — 분류: **{f.get('classification', 'unknown')}**")
+        print(f"- HTTP {f.get('http_status')} · {f.get('exception')}")
+        print(f"- 응답 앞부분({f.get('body_source')}): `{(f.get('body_head') or '-')[:300]}`")
+        if f.get("probe_error"):
+            print(f"- 프로브 오류: `{f['probe_error']}`")
+        print(f"- error: `{str(r.get('error'))[:500]}`")
+        print()
     print(f"- T = {r.get('T')} · total {r.get('total_sec')}s" + (f" · {r['note']}" if r.get("note") else ""))
     if kind == "stage1":
         sc = r.get("split_check") or {}
@@ -72,8 +81,6 @@ def main(kind: str) -> int:
         print("\n| step | sec |\n|---|---|")
         for st in r.get("steps", []):
             print(f"| {st['step']} | {st['sec']} |")
-        if r.get("error"):
-            print(f"- ❌ {r['error']}")
     return 0
 
 

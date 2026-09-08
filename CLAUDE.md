@@ -27,7 +27,7 @@ DESIGN.md와 코드가 충돌하면 DESIGN.md가 옳고 코드가 버그다.
 - `markets`, `periods`, `top_n`
 - `exclude.*` (etn, spac, preferred, administrative, suspended) — ETF·신규상장은 항상 제외(고정)
 - `filters.min_avg_trading_value` (0이면 미적용)
-- `fetch.sleep_sec` / `fetch.max_retries` / `fetch.cache_dir`
+- `fetch.sleep_sec` / `fetch.max_retries` / `fetch.import_retry_backoff_sec` / `fetch.cache_dir`
 - `output.dir` / `output.formats` / `output.sqlite_path`
 - `notify.enabled` / `notify.channel`
 
@@ -102,6 +102,9 @@ SQLite 테이블 `movers`는 동일 스키마, PK = `(base_date, market, period,
 - 한 조합 실행은 `python scripts/run_one.py --market KOSPI --period 1d`. 오케스트레이션은 5단계에서 main.py로 옮긴다.
 - `src/fetch.py`의 `Fetcher`가 유일한 네트워크 진입점이다. pykrx는 `_pykrx()`에서 지연 import하고 `KRX_ID/KRX_PW` 없음은
   `KRXCredentialsError`, 접속·재시도 실패는 `KRXUnavailableError`. 캐시는 `data/cache/<날짜>/<엔드포인트>__<인자>.json`.
+  import 실패(KRX가 JSON 대신 HTML 응답 → JSONDecodeError)도 재시도·백오프하며, 최종 실패는 `diagnose_krx_failure`로
+  점검/차단/자격증명/unknown을 분류해 `KRXUnavailableError.diagnosis`에 담는다. 스크립트는 이를 결과 JSON `failure`에 써서 Summary 맨 위에 보인다.
+  pykrx는 자격증명 오류를 print만 하므로 import 직후 `_check_authenticated`로 세션 인증 여부를 확인한다.
   테스트는 `pykrx_ns`, `sleep_fn`, `http_post`, `env`를 주입한다(tests/test_fetch.py 참고).
 - 검증 결과 JSON은 `docs/results/<kind>_result.json`(최신) + `<kind>_result_<T>.json`(이력)에 남기고 워크플로가 main에 커밋한다.
   다음 검증 스크립트는 이 파일로 개수를 자동 대조한다. 로그(`*.log`)는 artifact에만.
