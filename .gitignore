@@ -7,3 +7,5 @@ data/
 outputs/
 docs/stage1_result.json
 docs/stage1_run.log
+docs/universe_result.json
+docs/universe_run.log

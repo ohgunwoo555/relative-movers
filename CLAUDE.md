@@ -78,7 +78,7 @@ SQLite 테이블 `movers`는 동일 스키마, PK = `(base_date, market, period,
 ## 7. 구현 순서 (DESIGN.md 10절)
 단계를 건너뛰지 않는다. 현재 단계와 다음 단계는 아래를 갱신한다.
 1. ✅ 환경·데이터 검증 (pykrx 5종 호출, 액면분할 검증, 소요시간) — 결과: `docs/stage1_validation.md`
-2. **진행 중** calendar.py(완료) + universe.py + 테스트
+2. ✅ calendar.py + universe.py + 테스트 (관리종목 소스는 `validate_universe` 워크플로 결과로 확정 — docs/administrative_issue.md)
 3. fetch.py (캐시·재시도)
 4. calc.py + rank.py — (KOSPI, 1d) 한 조합 먼저 끝까지, 이후 루프 확장
 5. report.py + main.py — 20개 랭킹 통합 출력, SQLite 저장
@@ -90,6 +90,12 @@ SQLite 테이블 `movers`는 동일 스키마, PK = `(base_date, market, period,
 - `src/`는 패키지다. 항상 `from src.calendar import ...`, 실행은 `python -m src.main`. `src/`를 sys.path에 직접 넣지 않는다
   (`src/calendar.py`가 표준 라이브러리 `calendar`를 가리므로). `pytest.ini`의 `pythonpath = .`가 이를 보장한다.
 - 거래일 조회는 `src/calendar.py`에 주입하는 콜러블(`NearestBday`)로 추상화한다. 테스트는 가짜 달력, 운영은 fetch.py 래퍼.
+- 유니버스(`src/universe.py`)는 네트워크를 모른다. fetch.py가 `listed_frame`(티커→종목명, 소속부)과 ETF/ETN/관리종목 집합을 넘긴다.
+  우선주 = 코드 끝자리 != '0' 또는 종목명 접미사(우/우B/2우B/우(전환)…), 스팩 = 종목명 "스팩" 포함.
+  `exclude.*`가 켜져 있는데 목록이 None이면 **경고 로그 + `warnings` 기록 + 미적용**. 조용히 건너뛰지 않는다.
+- 기간 수익률 프레임은 계산 전에 반드시 `inner_join_universe`로 T 유니버스와 결합한다(상장폐지 -100 행·신규상장 제거).
+  거래정지는 `suspended_mask`(구간 거래량 0)로 calc 단계에서 제외.
+- git: 별도 브랜치 없이 `main`에 직접 커밋·푸시한다(사용자 지시, 2026-09-08).
 - 테스트는 `tests/`에 pytest. 네트워크 호출은 캐시 픽스처로 대체하고 실제 KRX 호출 테스트는 별도 마크.
 - 날짜는 내부적으로 `YYYYMMDD` 문자열(pykrx 규약)로 통일하고, 출력 스키마에서는 `YYYY-MM-DD`.
 - 엣지 케이스(신규상장·거래정지·상장폐지·액면분할)는 DESIGN.md 8절을 따른다.

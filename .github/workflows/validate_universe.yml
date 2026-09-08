@@ -1,0 +1,79 @@
+name: validate_universe
+
+# 2단계 검증: T 시점 KOSPI/KOSDAQ 유니버스 단계별 종목 수, 우선주 규칙 점검, 관리종목 소스 조사
+on:
+  workflow_dispatch:
+    inputs:
+      base_date:
+        description: "실행일 YYYYMMDD (기본 오늘)"
+        default: ""
+        required: false
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Unit tests (offline)
+        run: python -m pytest -q
+      - name: Run universe validation
+        id: run
+        env:
+          KRX_ID: ${{ secrets.KRX_ID }}
+          KRX_PW: ${{ secrets.KRX_PW }}
+          PYTHONUNBUFFERED: "1"
+        run: |
+          mkdir -p docs
+          set +e
+          python scripts/validate_universe.py \
+            $([ -n "${{ inputs.base_date }}" ] && echo --base-date "${{ inputs.base_date }}") \
+            2>&1 | tee docs/universe_run.log
+          rc=${PIPESTATUS[0]}
+          set -e
+          echo "exit_code=$rc" >> "$GITHUB_OUTPUT"
+          exit $rc
+      - name: Summarize
+        if: always()
+        run: |
+          {
+            echo "## universe validation (exit ${{ steps.run.outputs.exit_code }})"
+            echo
+            if [ -f docs/universe_result.json ]; then
+              python - <<'PY'
+          import json
+          r = json.load(open("docs/universe_result.json", encoding="utf-8"))
+          print(f"- T = {r.get('T')} · total {r.get('total_sec')}s · ETF {r.get('n_etf')} · ETN {r.get('n_etn')}")
+          for mkt, m in r.get("markets", {}).items():
+              if "steps" in m:
+                  print(f"- **{mkt}**: " + " → ".join(f"{k}={v}" for k, v in m["steps"]))
+                  print(f"  - 소속부: `{m['sect_value_counts']}`")
+                  print(f"  - 우선주 규칙 충돌: `{m['preferred_rule_conflicts'][:10]}`")
+                  if m.get("preferred_vs_basic_info"):
+                      print(f"  - 기본정보 대조: `{m['preferred_vs_basic_info']}`")
+                  for w in m.get("warnings", []):
+                      print(f"  - ⚠️ {w}")
+          print(f"- KIND 관리종목 페이지: `{r.get('kind_admin_page')}`")
+          PY
+            else
+              echo "_universe_result.json 없음 — 로그 artifact 참고_"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: universe-validation-${{ github.run_number }}
+          path: |
+            docs/universe_result.json
+            docs/universe_run.log
+          if-no-files-found: warn
+          retention-days: 30
