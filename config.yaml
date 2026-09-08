@@ -1,0 +1,38 @@
+# relative-movers 설정
+
+markets: [KOSPI, KOSDAQ]
+
+# 기간 정의 (calendar 기준, 시작일은 해당 날짜 이전 가장 가까운 거래일)
+periods:
+  1d: {days: 1, kind: trading_days}
+  1w: {days: 7, kind: calendar}
+  1m: {months: 1, kind: calendar}
+  6m: {months: 6, kind: calendar}
+  1y: {years: 1, kind: calendar}
+
+top_n: 20
+
+# 제외 규칙 (ETF, 신규상장은 항상 제외)
+exclude:
+  etn: true
+  spac: true
+  preferred: true        # 우선주
+  administrative: true   # 관리종목
+  suspended: true        # 기간 중 거래량 0
+
+filters:
+  min_avg_trading_value: 0   # 원 단위, 0이면 미적용 (예: 100000000 = 1억)
+
+fetch:
+  sleep_sec: 1
+  max_retries: 3
+  cache_dir: data/cache
+
+output:
+  dir: outputs
+  formats: [csv, md]
+  sqlite_path: data/movers.db
+
+notify:
+  enabled: false
+  channel: slack
