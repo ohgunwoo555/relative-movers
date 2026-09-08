@@ -1,0 +1,15 @@
+{
+  "run_at": "2026-09-08T04:13:47",
+  "market": "KOSPI",
+  "period": "1d",
+  "top_n": 20,
+  "steps": [],
+  "error": "pykrx import/KRX 로그인 실패: JSONDecodeError: Expecting value: line 1 column 1 (char 0)",
+  "total_sec": 1.9,
+  "fetch_stats": {
+    "network_calls": 0,
+    "cache_hits": 0,
+    "retries": 0
+  },
+  "exit_code": 1
+}
