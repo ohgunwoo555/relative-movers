@@ -2,18 +2,19 @@
 
 작성일: 2026-09-08 · 실행 환경: Claude Code 원격 컨테이너(해외 IP, 조직 egress 정책 적용)
 
-## 결론 요약
+## 결론 요약 (2026-09-08 GitHub Actions `validate_stage1` 실측 반영)
 
 | 항목 | 결과 |
 |---|---|
-| pykrx 설치 | **성공** — `pykrx==1.2.8` (pandas 2.3.3, numpy 2.4.6, Python 3.11) |
-| pykrx 함수 5종 실제 호출 | **미완료(차단)** — `data.krx.co.kr` 가 이 세션의 네트워크 egress 정책에서 403(policy denial)으로 차단됨. 우회하지 않음 |
-| 소요시간 측정 | **미완료(차단)** — 위와 동일. 측정 스크립트는 작성 완료(`scripts/validate_stage1.py`) |
-| 액면분할 수정주가 검증 | **미완료(차단)** — 검증 대상 종목·기간 확정, 판정 로직 스크립트에 구현 완료 |
-| 신규 발견(중요) | **pykrx ≥ 1.2 는 KRX Data Marketplace 로그인 필수** (`KRX_ID`/`KRX_PW` 환경변수). 2024-12-27 KRX 정보데이터시스템 개편에 따른 변경. DESIGN.md·config 에 반영 필요 |
+| pykrx 설치 | **성공** — `pykrx==1.2.8` (Python 3.11) |
+| pykrx 함수 5종 실제 호출 | **전부 성공** (exit 0). GitHub Actions `ubuntu-latest` 러너(해외 IP)에서 KRX 로그인·조회 정상 → **해외 IP 차단 없음** |
+| 소요시간 | 검증 스크립트 전체 **62.7초**(1년치 전종목 등락률 생략). 대부분의 호출 0.2~1.7초, 첫 `get_index_ohlcv` 8.0초·첫 `get_market_ohlcv` 5.9초는 워밍업성 지연 |
+| 액면분할 수정주가 검증 | **ADJUSTED** — 포스코스틸리온 058430(10:1, 2026-04-23) 구간 `[2026-03-16, 2026-05-22]`에서 `get_market_price_change(adjusted=True)` 등락률이 네이버 수정주가 수익률과 1%p 이내 일치. **예외 경로 불필요** |
+| 기간 정의 실측 | **OK** — 1d 구간(from = T)에서 `시가 == close(T 직전 거래일)`, `종가 == close(T)`, `등락률 == 공식`. 1w 구간 기준가도 from 직전 거래일 종가와 일치 |
+| 종목명 교차확인 | `get_market_ticker_name(058430) == 포스코스틸리온` 일치 |
+| 실행 환경 | **GitHub Actions cron 채택** (DESIGN.md 9절 확정). launchd 는 백업 |
 
-→ **1단계는 이 환경에서 완료할 수 없다.** 사용자 로컬(Mac, 국내 IP) 또는 KRX 호스트가 허용된 환경에서
-`scripts/validate_stage1.py` 를 한 번 실행하면 나머지 항목이 자동으로 채워진다(아래 "실행 방법").
+→ **1단계 완료.** 2단계(calendar.py + universe.py)로 진행.
 
 ## 1. 네트워크 차단 상세
 
@@ -23,9 +24,8 @@
 | `fchart.stock.naver.com` (http/https) | `get_market_ohlcv(adjusted=True)` 의 실제 데이터 소스 | 403 `Host not in allowlist` |
 | `kind.krx.co.kr`, 뉴스 사이트 | 액면분할 공시 확인 | EGRESS_BLOCKED |
 
-- 프록시 README 지침상 403/407 정책 거부는 재시도·우회 대상이 아니다. 따라서 "KRX 가 해외 IP 를 차단하는지"(DESIGN.md 9절)는
-  이 세션에서 **분리해서 판정할 수 없다** — KRX 응답이 아니라 우리 쪽 egress 정책이 먼저 막았기 때문이다.
-  GitHub Actions(해외 러너)에서의 접근 가능 여부는 별도 워크플로로 1회 확인이 필요하다.
+- 프록시 README 지침상 403/407 정책 거부는 재시도·우회 대상이 아니다. 위 차단은 Claude Code 원격 컨테이너에 한정된 것이며,
+  GitHub Actions 러너(해외 IP)에서는 KRX 로그인·조회가 정상 동작함을 4절 실측으로 확인했다.
 
 ## 2. pykrx 1.2.8 소스 분석으로 확인한 사실 (네트워크 불필요)
 
@@ -105,13 +105,56 @@ python scripts/validate_stage1.py                      # 기본: 포스코스틸
 - 스크립트는 DESIGN.md 규칙(호출 간 sleep 1s, 실패 시 3회 재시도)을 그대로 적용하며, 부분 실패 시 exit 1, 자격증명 없음 시 exit 2.
 - 더미 자격증명으로 실행해 실패 경로(import 시 로그인 실패 → 기록 → `docs/stage1_result.json` 저장 → exit 1)가 정상 동작함은 확인했다.
 
-## 4. 실측 결과 (로컬 실행 후 기입)
+## 4. 실측 결과 — GitHub Actions `validate_stage1` (2026-09-08, `skip_1y=true`)
+
+- 실행 환경: `ubuntu-latest`, Python 3.11, pykrx 1.2.8, `secrets.KRX_ID`/`KRX_PW` 주입 · exit 0 · 총 **62.7초**
+- T = **2026-09-07** (실행일 09-08 화 → 직전 거래일 월)
+- 유니버스: KOSPI **943** · KOSDAQ **1,822** · ETF **1,167** 종목
+- 기간 정의 실측(`definition_check`, 삼성전자 005930): **OK**
+- 액면분할 판정(`split_check`, 포스코스틸리온 058430, 구간 2026-03-16 ~ 05-22, 기준가일 03-13): **ADJUSTED**
+- 종목명 교차확인: 일치 (`name_mismatch = false`)
+- 상세 수치(A/B/C/D 등락률, 기준가)는 artifact `stage1-validation-<run>` 의 `stage1_result.json` 참고
 
 | call | ok | sec | rows |
 |---|---|---|---|
-| _(미실행)_ | | | |
+| import pykrx (KRX login at import) | True | 2.94 | — |
+| nearest_bday(20260908) | True | 0.30 | — |
+| nearest_bday(20260907) | True | 0.26 | — |
+| nearest_bday(20260831, prev=False) [1w from] | True | 0.25 | — |
+| nearest_bday(20260807, prev=False) [1m from] | True | 0.33 | — |
+| nearest_bday(20260307, prev=False) [6m from] | True | 0.36 | — |
+| nearest_bday(20250907, prev=False) [1y from] | True | 0.43 | — |
+| get_market_ticker_list(T, KOSPI) | True | 0.54 | 943 |
+| get_market_ticker_list(T, KOSDAQ) | True | 0.70 | 1822 |
+| get_etf_ticker_list(T) | True | 2.84 | 1167 |
+| nearest_bday(20260830) | True | 0.26 | — |
+| get_index_ohlcv(20260828, 20260907, 1001) | True | **8.03** | 7 |
+| get_index_ohlcv(20260828, 20260907, 2001) | True | 0.29 | 7 |
+| get_market_cap(T, KOSPI) | True | 0.53 | 943 |
+| get_market_price_change(20260907, 20260907, KOSPI) [1d] | True | 1.23 | 943 |
+| get_market_price_change(20260831, 20260907, KOSPI) [1w] | True | 1.48 | 943 |
+| get_market_price_change(20260831, 20260907, KOSDAQ) [1w] | True | 1.63 | 1823 |
+| nearest_bday(20260906) | True | 0.28 | — |
+| get_market_ohlcv(20260904, 20260907, 005930, adjusted=False) | True | **5.88** | 2 |
+| nearest_bday(20260830) | True | 0.24 | — |
+| get_market_ohlcv(20260828, 20260831, 005930, adjusted=False) | True | 0.24 | 2 |
+| get_market_ticker_name(058430) | True | 0.00 | — |
+| nearest_bday(20260314, prev=False) | True | 0.33 | — |
+| nearest_bday(20260523) | True | 0.28 | — |
+| nearest_bday(20260315) | True | 0.43 | — |
+| price_change(20260316, 20260522, KOSPI, adjusted=True) | True | 1.73 | 951 |
+| price_change(20260316, 20260522, KOSPI, adjusted=False) | True | 1.62 | 951 |
+| get_market_ohlcv(20260302, 20260522, 058430, adjusted=True) [naver] | True | 1.01 | 57 |
+| get_market_ohlcv(20260302, 20260522, 058430, adjusted=False) [krx] | True | 0.23 | 57 |
 
-액면분할 판정: _(미실행)_ · 기간 정의 실측(`definition_check`): _(미실행)_ · 종목명 교차확인: _(미실행)_
+### 4-1. 실측에서 얻은 설계 시사점
+- **전종목 등락률 행수 > 티커 목록**: 1w KOSDAQ 1,823 vs 1,822, 분할 구간 KOSPI 951 vs 943. pykrx 가 구간 중 상장폐지된 종목을
+  `종가 0, 등락률 -100` 행으로 덧붙이기 때문. DESIGN.md 6절의 "T 시점 유니버스와 inner join" 으로 자연 제거된다(calc 전에 join 필수).
+- **본 실행 예상 비용**: 호출당 ≈1~2초 + sleep 1초. 2시장 × 5기간 전종목 등락률(10회, 각 KRX 요청 4회) + 지수 10회 + 유니버스·시총 ≈ 30회 → 약 1~2분.
+  1년치 전종목 등락률은 이번에 생략했으므로 첫 본 실행에서 시간을 기록할 것(730일 미만이라 분할 조회 없음).
+- **첫 호출 지연**: 엔드포인트별 첫 호출이 6~8초 걸린다. 재시도 타임아웃은 15초 이상으로 잡는다.
+- **네이버 수정주가 경로도 GitHub 러너에서 정상**(1.01초). 예외 경로는 지금 불필요하지만 fetch.py 에 함수만 남겨 둔다.
+- 워크플로 경고: `actions/*@v4/v5` 가 Node 20 기반이라 deprecation 경고. 동작에는 영향 없음. 6단계에서 최신 메이저로 올린다.
 
 ## 5. DESIGN.md 반영 (완료)
 1. 2절: 기간 구간 `[from, T]`, from = 기준 날짜 이후 가장 가까운 거래일(1d는 from = T), 기준가 = from 직전 거래일 종가, 지수도 동일 구간으로 통일.

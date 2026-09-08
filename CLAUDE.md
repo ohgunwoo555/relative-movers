@@ -37,8 +37,9 @@ DESIGN.md와 코드가 충돌하면 DESIGN.md가 옳고 코드가 버그다.
   `get_nearest_business_day_in_a_week`.
 - 호출 간 `sleep(1)`, 실패 시 3회 재시도, 응답은 `data/cache/`에 일자별 저장.
   pykrx 내부에는 sleep이 없으므로 래퍼(`fetch.py`)에서 넣는다.
-- `get_market_price_change`의 액면분할(수정주가) 반영 여부는 1단계 검증 결과에 따른다.
-  미반영이면 `get_market_ohlcv(ticker, adjusted=True)`로 해당 종목만 재계산하는 예외 경로를 둔다.
+- `get_market_price_change(adjusted=True)`는 액면분할을 반영한다(1단계 실측 ADJUSTED). 예외 경로
+  `get_market_ohlcv(ticker, adjusted=True)`는 fetch.py에 함수만 두고 사용하지 않는다.
+- 전종목 등락률에는 구간 중 상장폐지 종목이 `종가 0, 등락률 -100`으로 덧붙는다. T 시점 유니버스와 inner join 후 계산한다.
 - 2순위 대체: KIS Open API.
 
 ### 4-1. 1단계 검증에서 확인된 pykrx 1.2.8 특성 (docs/stage1_validation.md 참고)
@@ -53,6 +54,7 @@ DESIGN.md와 코드가 충돌하면 DESIGN.md가 옳고 코드가 버그다.
 - 1단계 실행 스크립트: `python scripts/validate_stage1.py` (원격 컨테이너에서는 KRX 호스트가 차단되어 로컬에서 실행),
   또는 GitHub Actions `validate_stage1` 워크플로를 수동 실행(Secrets `KRX_ID`/`KRX_PW` 필요).
 - 시크릿: GitHub Actions는 리포지토리 Secrets, launchd는 git 밖의 환경변수 파일 (DESIGN.md 9절).
+- 실행 환경 확정: GitHub Actions cron (`0 22 * * *` UTC = 07:00 KST). 러너에서 KRX 접근 정상(2026-09-08 실측). launchd는 백업.
 
 ## 5. 프로젝트 구조 / 모듈 책임 (DESIGN.md 5절)
 ```
@@ -75,8 +77,8 @@ SQLite 테이블 `movers`는 동일 스키마, PK = `(base_date, market, period,
 
 ## 7. 구현 순서 (DESIGN.md 10절)
 단계를 건너뛰지 않는다. 현재 단계와 다음 단계는 아래를 갱신한다.
-1. 환경·데이터 검증 (pykrx 5종 호출, 액면분할 검증, 소요시간) — 결과: `docs/stage1_validation.md`
-2. calendar.py + universe.py + 테스트
+1. ✅ 환경·데이터 검증 (pykrx 5종 호출, 액면분할 검증, 소요시간) — 결과: `docs/stage1_validation.md`
+2. **진행 중** calendar.py(완료) + universe.py + 테스트
 3. fetch.py (캐시·재시도)
 4. calc.py + rank.py — (KOSPI, 1d) 한 조합 먼저 끝까지, 이후 루프 확장
 5. report.py + main.py — 20개 랭킹 통합 출력, SQLite 저장
@@ -85,6 +87,9 @@ SQLite 테이블 `movers`는 동일 스키마, PK = `(base_date, market, period,
 
 ## 8. 개발 관례
 - Python 3.10+, 의존성은 `requirements.txt`에 고정.
+- `src/`는 패키지다. 항상 `from src.calendar import ...`, 실행은 `python -m src.main`. `src/`를 sys.path에 직접 넣지 않는다
+  (`src/calendar.py`가 표준 라이브러리 `calendar`를 가리므로). `pytest.ini`의 `pythonpath = .`가 이를 보장한다.
+- 거래일 조회는 `src/calendar.py`에 주입하는 콜러블(`NearestBday`)로 추상화한다. 테스트는 가짜 달력, 운영은 fetch.py 래퍼.
 - 테스트는 `tests/`에 pytest. 네트워크 호출은 캐시 픽스처로 대체하고 실제 KRX 호출 테스트는 별도 마크.
 - 날짜는 내부적으로 `YYYYMMDD` 문자열(pykrx 규약)로 통일하고, 출력 스키마에서는 `YYYY-MM-DD`.
 - 엣지 케이스(신규상장·거래정지·상장폐지·액면분할)는 DESIGN.md 8절을 따른다.

@@ -50,7 +50,8 @@ todate를 "이전 가장 가까운 거래일"로 보정하고 시작일 **기준
 - **래퍼 sleep**: pykrx 내부에는 호출 간 sleep이 없다. `fetch.py`에서 호출 간 `sleep(1)`, 실패 시 3회 재시도, 응답은 `data/cache/`에 일자별 저장.
   `get_market_price_change` 1회는 KRX 요청 4회(거래일 보정 2 + 조회 2)를 발생시킨다.
 - `get_market_price_change(fromdate, todate, market, adjusted=True)`: `adjusted` 기본값 True. 반환 `시가` = 시작일 기준가(2절 정의).
-  액면분할 반영 여부를 1단계에서 검증. 미반영이면 `get_market_ohlcv(ticker, adjusted=True)`로 해당 종목만 재계산하는 예외 경로 추가
+  **1단계 검증 결과 액면분할 반영 확인(ADJUSTED, 포스코스틸리온 10:1)** → 예외 경로는 당장 불필요. fetch.py에 함수만 두고 미사용
+  - 구간 중 상장폐지 종목이 `종가 0, 등락률 -100` 행으로 덧붙어 반환된다(행수 > 티커 목록). T 시점 유니버스와 inner join으로 제거
 - **예외 경로는 네이버 API**: `get_market_ohlcv(..., adjusted=True)`의 실제 소스는 KRX가 아니라 네이버 차트 API(`fchart.stock.naver.com`)다.
   KRX 장애와 독립적이지만 별도 차단·변경 가능성이 있으므로 fetch.py에서 별개의 소스로 취급한다(`adjusted=False`만 KRX).
 - 2순위 대체: KIS Open API (기간별 시세). 종목별 호출이므로 로컬 DB 축적 방식 필요
@@ -107,10 +108,11 @@ SQLite 테이블 `movers`는 동일 스키마. PK = (base_date, market, period, 
 - KRX 응답 실패: 재시도 후 실패 시 알림, 캐시로 재실행 시 중복 호출 방지
 
 ## 9. 스케줄링
-- 1안 GitHub Actions cron (매일 07:00 KST). KRX 해외 IP 차단 여부를 1단계에서 확인
-  (`.github/workflows/validate_stage1.yml`을 workflow_dispatch로 실행)
-- 2안 launchd (Mac). 로컬 실행
-- main.py는 동일, 실행 환경만 다름
+- **확정: 1안 GitHub Actions cron** (매일 07:00 KST = `0 22 * * *` UTC).
+  2026-09-08 `validate_stage1` 워크플로 실측으로 `ubuntu-latest` 러너(해외 IP)에서 KRX 로그인·조회가 정상임을 확인
+  (해외 IP 차단 없음, 검증 스크립트 62.7초). 휴장일에는 main.py가 T 판정 단계에서 즉시 종료하므로 매일 실행해도 된다.
+- 2안 launchd (Mac)는 GitHub Actions 장애·KRX 정책 변경 시 백업. 로컬 실행
+- main.py는 동일, 실행 환경만 다름. 결과(`outputs/`, `data/movers.db`)는 Actions artifact 또는 별도 브랜치/스토리지로 보존(6단계에서 결정)
 - **시크릿 관리**: `KRX_ID`/`KRX_PW`(및 Slack 토큰)는
   GitHub Actions → 리포지토리 **Secrets**(`secrets.KRX_ID`, `secrets.KRX_PW`)를 `env`로 주입,
   launchd → git에 넣지 않는 **환경변수 파일**(예: `~/.config/relative-movers/env`, `.gitignore`의 `.env`)을
