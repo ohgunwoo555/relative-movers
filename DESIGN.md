@@ -9,11 +9,16 @@
 | 항목 | 정의 |
 |---|---|
 | 기준일 T | 실행 시점 기준 직전 거래일. 실행일이 휴장일이면 즉시 종료 |
-| 기간 시작일 | 1d: T의 직전 거래일 / 1w: T-7일 / 1m: T-1개월 / 6m: T-6개월 / 1y: T-1년 → 각각 그 날짜 이전 가장 가까운 거래일 |
-| 종목 수익률 | `close(T) / close(start) - 1` (수정주가 기준) |
-| 시장 수익률 | KOSPI 지수(1001), KOSDAQ 지수(2001)의 동일 기간 수익률 |
+| 기간 구간 | `[from, T]`. 기준 날짜: 1d = T / 1w = T-7일 / 1m = T-1개월 / 6m = T-6개월 / 1y = T-1년 |
+| 구간 시작일 from | 기준 날짜 **이후** 가장 가까운 거래일 (1d는 from = T) |
+| 기준가 | from **직전 거래일의 종가** (수정주가). `get_market_price_change(from, T)`의 `시가` 컬럼(BAS_PRC)과 동일 |
+| 종목 수익률 | `close(T) / 기준가 - 1` (수정주가 기준). 1d는 `close(T) / close(T 직전 거래일) - 1` |
+| 시장 수익률 | KOSPI 지수(1001), KOSDAQ 지수(2001): `idx(T) / idx(from 직전 거래일) - 1` — 종목과 동일 구간 |
 | 초과수익률 | `stock_ret - market_ret` (%p). **랭킹 정렬 키** |
 | 산출 개수 | 상위 N, 하위 N (config `top_n`, 기본 20) |
+
+구간 방식을 `[from, T]`로 잡는 이유: pykrx `get_market_price_change`가 fromdate를 "이후 가장 가까운 거래일"로,
+todate를 "이전 가장 가까운 거래일"로 보정하고 시작일 **기준가** 대비 등락률을 돌려주므로, 정의와 데이터 소스가 1:1로 대응한다.
 
 ## 3. 유니버스 및 제외 규칙
 기본 유니버스: T 시점 KOSPI / KOSDAQ 상장 종목 전체.
@@ -38,9 +43,16 @@
 - `get_nearest_business_day_in_a_week(date)` — 거래일 보정
 
 주의:
-- 호출 간 `sleep(1)`, 실패 시 3회 재시도, 응답은 `data/cache/`에 일자별 저장
-- `get_market_price_change`의 액면분할 반영 여부를 1단계에서 검증. 미반영이면
-  `get_market_ohlcv(ticker, adjusted=True)`로 해당 종목만 재계산하는 예외 경로 추가
+- **KRX 로그인 필수** (pykrx ≥ 1.2): KRX Data Marketplace 계정을 환경변수 `KRX_ID`, `KRX_PW`로 공급한다.
+  config.yaml·코드에 자격증명을 넣지 않는다. 세션은 1시간 만료, pykrx가 자동 재로그인한다.
+- **지연 import**: pykrx는 import 시점에 로그인하며 KRX에 닿지 못하면 import 자체가 예외를 던진다.
+  `fetch.py`는 pykrx를 함수 안에서 import하고 예외를 잡아 "KRX 접근 불가"로 처리한다(main.py가 트레이스백으로 죽지 않게).
+- **래퍼 sleep**: pykrx 내부에는 호출 간 sleep이 없다. `fetch.py`에서 호출 간 `sleep(1)`, 실패 시 3회 재시도, 응답은 `data/cache/`에 일자별 저장.
+  `get_market_price_change` 1회는 KRX 요청 4회(거래일 보정 2 + 조회 2)를 발생시킨다.
+- `get_market_price_change(fromdate, todate, market, adjusted=True)`: `adjusted` 기본값 True. 반환 `시가` = 시작일 기준가(2절 정의).
+  액면분할 반영 여부를 1단계에서 검증. 미반영이면 `get_market_ohlcv(ticker, adjusted=True)`로 해당 종목만 재계산하는 예외 경로 추가
+- **예외 경로는 네이버 API**: `get_market_ohlcv(..., adjusted=True)`의 실제 소스는 KRX가 아니라 네이버 차트 API(`fchart.stock.naver.com`)다.
+  KRX 장애와 독립적이지만 별도 차단·변경 가능성이 있으므로 fetch.py에서 별개의 소스로 취급한다(`adjusted=False`만 KRX).
 - 2순위 대체: KIS Open API (기간별 시세). 종목별 호출이므로 로컬 DB 축적 방식 필요
 
 ## 5. 프로젝트 구조
@@ -82,7 +94,7 @@ relative-movers/
 | direction | up / down |
 | rank | 1~N |
 | ticker, name | |
-| start_date, start_close, end_close | 실제 사용된 시작 거래일과 종가 |
+| start_date, start_close, end_close | start_date = 구간 시작 거래일 from, start_close = 기준가(from 직전 거래일 종가), end_close = close(T) |
 | stock_ret, market_ret | % |
 | excess_ret | %p (정렬 키) |
 | market_cap, trading_value | 부가정보 |
@@ -96,8 +108,13 @@ SQLite 테이블 `movers`는 동일 스키마. PK = (base_date, market, period, 
 
 ## 9. 스케줄링
 - 1안 GitHub Actions cron (매일 07:00 KST). KRX 해외 IP 차단 여부를 1단계에서 확인
+  (`.github/workflows/validate_stage1.yml`을 workflow_dispatch로 실행)
 - 2안 launchd (Mac). 로컬 실행
 - main.py는 동일, 실행 환경만 다름
+- **시크릿 관리**: `KRX_ID`/`KRX_PW`(및 Slack 토큰)는
+  GitHub Actions → 리포지토리 **Secrets**(`secrets.KRX_ID`, `secrets.KRX_PW`)를 `env`로 주입,
+  launchd → git에 넣지 않는 **환경변수 파일**(예: `~/.config/relative-movers/env`, `.gitignore`의 `.env`)을
+  plist `EnvironmentVariables` 또는 실행 래퍼 스크립트에서 `source`하여 공급. 코드·config·로그에 자격증명을 남기지 않는다
 
 ## 10. 구현 단계 (Claude Code 프롬프트 단위)
 1. 환경·데이터 검증: pykrx 함수 5종 실제 호출, 액면분할 종목 검증, 소요시간 측정

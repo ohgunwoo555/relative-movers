@@ -14,10 +14,11 @@ DESIGN.md와 코드가 충돌하면 DESIGN.md가 옳고 코드가 버그다.
 
 ## 2. 반드시 지킬 정의 (DESIGN.md 2절 요약, 원문이 우선)
 - **T**: 실행 시점 기준 직전 거래일. 실행일이 휴장일이면 즉시 종료.
-- **기간 시작일**: 1d는 T의 직전 거래일. 1w/1m/6m/1y는 달력 기준 T-7일/T-1개월/T-6개월/T-1년
-  → 그 날짜 이전 가장 가까운 거래일.
-- **종목 수익률**: `close(T) / close(start) - 1`, **수정주가 기준**.
-- **시장 수익률**: KOSPI 지수 `1001`, KOSDAQ 지수 `2001`의 동일 기간 수익률.
+- **기간 구간 `[from, T]`**: 기준 날짜는 1d = T, 1w/1m/6m/1y = T-7일/T-1개월/T-6개월/T-1년.
+  from = 기준 날짜 **이후** 가장 가까운 거래일 (1d는 from = T).
+- **기준가**: from 직전 거래일의 종가(수정주가) = `get_market_price_change(from, T)`의 `시가`.
+- **종목 수익률**: `close(T) / 기준가 - 1`, **수정주가 기준**.
+- **시장 수익률**: KOSPI 지수 `1001`, KOSDAQ 지수 `2001`의 `idx(T) / idx(from 직전 거래일) - 1`.
 - **초과수익률**: `stock_ret - market_ret` (%p). **랭킹 정렬 키.**
 - **산출 개수**: 상위 N, 하위 N (`config.yaml`의 `top_n`, 기본 20).
 
@@ -45,11 +46,13 @@ DESIGN.md와 코드가 충돌하면 DESIGN.md가 옳고 코드가 버그다.
 - **import 시점 로그인**: 자격증명이 있고 KRX에 닿지 못하면 `from pykrx import stock`이 예외를 던진다.
   pykrx는 함수 안에서 지연 import하고 예외를 잡아 "KRX 접근 불가"로 처리한다.
 - `get_market_price_change(..., adjusted=True)`는 호출 1회당 KRX 요청 4회를 발생시킨다.
-- `get_market_price_change`의 `시가` 컬럼은 시작일 **기준가**(전일 종가)다. DESIGN.md의
-  `close(start)`와 같은지 1단계 실측(`base_price_equals_first_close`)으로 확정한 뒤 calendar.py를 짠다.
+- `get_market_price_change`의 `시가` 컬럼은 시작일 **기준가**(from 직전 거래일 종가)이며 DESIGN.md 2절 정의와 동일하다.
+  1단계 스크립트가 `base_price_matches_prev_close`로 실측 확인한다.
 - `get_market_ohlcv(adjusted=True)`의 실제 소스는 KRX가 아니라 **네이버**(`fchart.stock.naver.com`)다.
 - 액면분할 검증 기본 종목: 포스코스틸리온 058430 (KOSPI, 10:1, 신주상장 2026-04-23).
-- 1단계 실행 스크립트: `python scripts/validate_stage1.py` (원격 컨테이너에서는 KRX 호스트가 차단되어 로컬에서 실행).
+- 1단계 실행 스크립트: `python scripts/validate_stage1.py` (원격 컨테이너에서는 KRX 호스트가 차단되어 로컬에서 실행),
+  또는 GitHub Actions `validate_stage1` 워크플로를 수동 실행(Secrets `KRX_ID`/`KRX_PW` 필요).
+- 시크릿: GitHub Actions는 리포지토리 Secrets, launchd는 git 밖의 환경변수 파일 (DESIGN.md 9절).
 
 ## 5. 프로젝트 구조 / 모듈 책임 (DESIGN.md 5절)
 ```

@@ -6,3 +6,4 @@ venv/
 data/
 outputs/
 docs/stage1_result.json
+docs/stage1_run.log

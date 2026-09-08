@@ -52,19 +52,27 @@
 | (예외 경로) `get_market_ohlcv(from, to, ticker, adjusted=True)` | **Naver** `fchart.stock.naver.com` | 1회 | KRX 가 아니라 네이버 차트 API. `adjusted=False` 만 KRX |
 
 - pykrx 내부에는 호출 간 sleep 이 없다(730일 분할 구간 제외). DESIGN.md 의 `sleep(1)` 은 래퍼(`fetch.py`)에서 넣어야 한다.
-- **주의 — `시가` 컬럼의 의미**: `get_market_price_change` 의 `시가` 는 KRX 응답의 `BAS_PRC`(시작일 **기준가**)이며, 통상 "시작일의 전일 종가(권리 반영)" 다.
-  DESIGN.md 2절 정의 `close(T)/close(start) - 1` 과 정확히 일치시키려면
-  (a) `fromdate = start 의 다음 거래일` 로 호출하거나 (b) 등락률 대신 별도 종가로 재계산해야 한다.
-  검증 스크립트가 `base_price_equals_first_close` 항목으로 이를 판정하도록 해두었다. **2단계(calendar.py) 전에 실행 결과로 확정할 것.**
+- **`시가` 컬럼의 의미**: `get_market_price_change` 의 `시가` 는 KRX 응답의 `BAS_PRC`(시작일 **기준가** = from 직전 거래일 종가)다.
+  DESIGN.md 2절은 이에 맞춰 구간 `[from, T]`, 기준가 = from 직전 거래일 종가, 수익률 = `close(T)/기준가 - 1` 로 정의했다
+  (pykrx 는 fromdate 를 이후 가장 가까운 거래일, todate 를 이전 가장 가까운 거래일로 보정 → 정의와 1:1 대응).
+  스크립트의 `definition_check` 가 1d 구간(from = T)에서 `시가 == close(T 직전 거래일)`, `종가 == close(T)`, `등락률 == 공식` 을 실측하고,
+  1w 구간에서도 `시가 == close(from 직전 거래일)` 을 확인한다(`base_price_matches_prev_close`).
 
 ### 2-3. 수정주가 반영 여부 — 판정 방법(스크립트 구현)
-분할 전후를 포함하는 구간 `[분할상장일-40일, 분할상장일+30일]` 에 대해
-1. `get_market_price_change(..., adjusted=True)` 의 등락률 (A)
-2. `get_market_price_change(..., adjusted=False)` 의 등락률 (B, 미반영 기대값 ≈ -90%)
-3. `get_market_ohlcv(ticker, adjusted=True)` 첫·끝 종가로 계산한 수익률 (C, 네이버 수정주가 = 정답)
-4. `get_market_ohlcv(ticker, adjusted=False)` 로 계산한 수익률 (D)
+구간 from = (분할상장일 − 40일) 이후 가장 가까운 거래일, to = min(분할상장일 + 30일, T) 이전 가장 가까운 거래일에 대해
+1. `get_market_price_change(from, to, adjusted=True)` 의 등락률 (A)
+2. `get_market_price_change(from, to, adjusted=False)` 의 등락률 (B, 미반영 기대값 ≈ -90%)
+3. `get_market_ohlcv(ticker, adjusted=True)`(네이버 수정주가 = 정답)로 `close(to) / close(from 직전 거래일) − 1` (C)
+4. `get_market_ohlcv(ticker, adjusted=False)`(KRX 원시가)로 동일 계산 (D)
 
 판정: `|A − C| < 1%p` 면 **ADJUSTED**(반영), 아니면 **NOT_ADJUSTED** → DESIGN.md 4절의 예외 경로(`get_market_ohlcv(adjusted=True)` 종목별 재계산) 활성화.
+보조: `|D − C| < 5%p` 면 구간에 분할이 없었다는 뜻이므로 경고(종목·날짜 오류 의심). `base_price_matches_adjusted_prev_close` 로 A 의 기준가가 수정 전일 종가와 같은지도 기록.
+
+**종목코드 교차확인**: `get_market_ticker_name(ticker)` 가 `--split-name` 과 다르면 T 시점 해당 시장 전종목 등락률의 `종목명` 으로 코드를 찾아 대체하고(`ticker_resolved_by_name`),
+찾지 못하면 `TICKER_MISMATCH` 로 검증을 중단한다.
+
+오프라인 검증: 가짜 pykrx 로 10:1 분할 시나리오를 만들어 4가지 경우(반영 → ADJUSTED / 미반영 → NOT_ADJUSTED / 잘못된 코드 → 종목명으로 대체 / 없는 종목명 → TICKER_MISMATCH)와
+1d·1w 기간 정의 실측이 기대대로 판정됨을 확인했다.
 
 ### 2-4. 검증 대상 종목 (최근 1년 내 액면분할)
 
@@ -76,14 +84,21 @@
 
 10:1 분할이라 미반영 시 등락률이 -90% 근처로 나와 판정이 명확하다. 종목코드는 기사 본문을 열지 못해(차단) 기억에 의존했으므로 실행 시 `종목명` 컬럼으로 교차확인할 것.
 
-## 3. 실행 방법 (로컬)
+## 3. 실행 방법
 
+### 3-1. GitHub Actions (권장 — 해외 IP 차단 여부도 함께 확인)
+1. 리포지토리 Settings → Secrets and variables → Actions 에 `KRX_ID`, `KRX_PW` 등록
+2. Actions 탭 → `validate_stage1` → **Run workflow** (입력값 기본: 포스코스틸리온 058430 / 2026-04-23 / KOSPI)
+3. 실행 요약(Job Summary)에 판정·소요시간 표가 뜨고, artifact `stage1-validation-<run>` 에 `stage1_result.json`, `stage1_run.log` 가 올라간다
+   - import 단계에서 실패하면 KRX 로그인 또는 해외 IP 차단(DESIGN.md 9절) 문제다. 로그의 예외 메시지로 구분한다
+
+### 3-2. 로컬 (Mac)
 ```bash
 pip install -r requirements.txt
 export KRX_ID='<KRX Data Marketplace ID>'
 export KRX_PW='<비밀번호>'
 python scripts/validate_stage1.py                      # 기본: 포스코스틸리온 058430, 2026-04-23
-# python scripts/validate_stage1.py --split-ticker 290560 --split-date 20260223 --market KOSDAQ
+# python scripts/validate_stage1.py --split-ticker 290560 --split-name 신시웨이 --split-date 20260223 --market KOSDAQ
 ```
 - 출력: 함수별 소요시간·행수 표(stdout) + `docs/stage1_result.json` (gitignore 대상. 요약값은 이 문서 4절에 옮겨 적는다)
 - `--skip-1y` 로 1년치 전종목 등락률 호출을 생략할 수 있다(가장 오래 걸리는 호출).
@@ -96,10 +111,10 @@ python scripts/validate_stage1.py                      # 기본: 포스코스틸
 |---|---|---|---|
 | _(미실행)_ | | | |
 
-액면분할 판정: _(미실행)_ · `시가`=close(start) 여부: _(미실행)_
+액면분할 판정: _(미실행)_ · 기간 정의 실측(`definition_check`): _(미실행)_ · 종목명 교차확인: _(미실행)_
 
-## 5. DESIGN.md / config 반영 제안 (사용자 확인 후 적용)
-1. 4절 데이터 소스에 "pykrx ≥1.2: `KRX_ID`/`KRX_PW` 필수, 1시간 세션" 추가. config 에 자격증명은 넣지 않고 환경변수만 사용.
-2. 4절 `get_market_price_change` 항목에 `adjusted=True` 명시, `시가`=기준가(전일 종가) 주의 추가.
-3. 4절 예외 경로 `get_market_ohlcv(adjusted=True)` 의 소스가 **네이버**임을 명시 (KRX 장애와 독립적이라는 장점, 별도 차단 가능성이라는 단점).
-4. 9절 GitHub Actions 안: KRX 로그인 + 해외 IP 두 가지를 모두 워크플로 1회 실행으로 확인.
+## 5. DESIGN.md 반영 (완료)
+1. 2절: 기간 구간 `[from, T]`, from = 기준 날짜 이후 가장 가까운 거래일(1d는 from = T), 기준가 = from 직전 거래일 종가, 지수도 동일 구간으로 통일.
+2. 4절: KRX 로그인 필수(`KRX_ID`/`KRX_PW`), 지연 import, 래퍼 sleep, 예외 경로가 네이버 API 임을 명시.
+3. 7절: `start_date` = from, `start_close` = 기준가로 의미 명확화.
+4. 9절: 시크릿은 GitHub Actions Secrets / launchd 는 환경변수 파일. `validate_stage1` 워크플로로 해외 IP 차단 여부 확인.
