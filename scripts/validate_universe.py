@@ -26,7 +26,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from src.calendar import resolve_base_date  # noqa: E402
+from src.calendar import today_kst, resolve_base_date  # noqa: E402
 from src.universe import (  # noqa: E402
     administrative_from_sect, build_universe, listed_frame, preferred_rule_breakdown,
 )
@@ -67,7 +67,7 @@ def value_counts(series, top: int = 15) -> dict:
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--base-date", default=dt.date.today().strftime("%Y%m%d"))
+    ap.add_argument("--base-date", default=today_kst())
     ap.add_argument("--stage1-json", default=str(RESULTS_DIR / "stage1_result.json"))
     ap.add_argument("--config", default=str(ROOT / "config.yaml"))
     args = ap.parse_args()
@@ -191,8 +191,6 @@ def _finish(summary: dict, total_t0: float) -> int:
     RESULT_JSON.parent.mkdir(parents=True, exist_ok=True)
     text = json.dumps(summary, ensure_ascii=False, indent=2, default=str)
     RESULT_JSON.write_text(text, encoding="utf-8")
-    if summary.get("T"):
-        (RESULT_JSON.parent / f"universe_result_{summary['T']}.json").write_text(text, encoding="utf-8")
     print("\n=== 요약 ===")
     for mkt, m in summary.get("markets", {}).items():
         if "steps" in m:

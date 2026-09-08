@@ -10,7 +10,8 @@
 한 조합이 실패해도 나머지 조합은 계속 진행하고, 성공한 조합의 결과는 저장한다.
 
 실행: python -m src.main [--base-date YYYYMMDD] [--markets KOSPI,KOSDAQ] [--periods 1d,1w] [--top-n N]
-                          [--config config.yaml] [--cache-dir DIR] [--output-dir DIR] [--sqlite-path FILE] [--no-db]
+                          [--config config.yaml] [--cache-dir DIR] [--output-dir DIR] [--sqlite-path FILE] [--no-db] [--daily-dir DIR]
+실행일 기본값은 KST 날짜(`calendar.today_kst`). cron 이 수십 분 지연돼도 같은 KST 날짜면 T 는 같다.
 """
 from __future__ import annotations
 
@@ -28,7 +29,7 @@ import pandas as pd
 import yaml
 
 from src.calc import RESULT_COLUMNS, compute
-from src.calendar import period_window, resolve_base_date
+from src.calendar import period_window, resolve_base_date, today_kst
 from src.fetch import Fetcher, KRXCredentialsError, KRXUnavailableError
 from src.rank import top_and_bottom
 from src.report import render_markdown, upsert_sqlite, write_csv, write_markdown
@@ -226,8 +227,8 @@ def run(config: Mapping, fetcher: Fetcher, base_date: str, *, markets: list[str]
 
 def write_outputs(result: RunResult, config: Mapping, *, output_dir: str | Path | None = None,
                   sqlite_path: str | Path | None = None, formats: list[str] | None = None,
-                  write_db: bool = True) -> dict:
-    """outputs/<T>/movers.csv, movers.md, SQLite upsert. 반환: 생성 경로."""
+                  write_db: bool = True, daily_dir: str | Path | None = None) -> dict:
+    """outputs/<T>/movers.csv, movers.md, SQLite upsert(로컬 파생물), daily_dir/<T>.csv|.md(git 커밋 대상). 반환: 생성 경로."""
     if result.T is None:
         return {}
     ocfg = dict(config.get("output", {}) or {})
@@ -246,6 +247,12 @@ def write_outputs(result: RunResult, config: Mapping, *, output_dir: str | Path 
         db = Path(sqlite_path or ocfg.get("sqlite_path", "data/movers.db"))
         paths["sqlite"] = str(db)
         paths["sqlite_rows"] = upsert_sqlite(movers, db)
+    daily = daily_dir or ocfg.get("daily_dir")
+    if daily:
+        ddir = Path(daily)
+        paths["daily_csv"] = str(write_csv(movers, ddir / f"{result.T}.csv"))
+        if "md" in paths:
+            paths["daily_md"] = str(write_markdown(Path(paths["md"]).read_text(encoding="utf-8"), ddir / f"{result.T}.md"))
     return paths
 
 
@@ -254,7 +261,7 @@ def write_outputs(result: RunResult, config: Mapping, *, output_dir: str | Path 
 # ──────────────────────────────────────────────────────────────────────────
 def build_parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(description="relative-movers — 시장 대비 상대 등락 종목 일별 산출")
-    ap.add_argument("--base-date", default=dt.date.today().strftime("%Y%m%d"), help="실행일 YYYYMMDD (기본 오늘)")
+    ap.add_argument("--base-date", default=None, help="실행일 YYYYMMDD (기본: 오늘, KST 날짜)")
     ap.add_argument("--markets", default=None, help="쉼표 구분 (기본 config.markets)")
     ap.add_argument("--periods", default=None, help="쉼표 구분 (기본 config.periods)")
     ap.add_argument("--top-n", type=int, default=None)
@@ -262,7 +269,8 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument("--cache-dir", default=None)
     ap.add_argument("--output-dir", default=None)
     ap.add_argument("--sqlite-path", default=None)
-    ap.add_argument("--no-db", action="store_true", help="SQLite 저장 생략")
+    ap.add_argument("--no-db", action="store_true", help="SQLite 저장 생략 (DB 는 scripts/rebuild_db.py 로 daily CSV 에서 재구성 가능)")
+    ap.add_argument("--daily-dir", default=None, help="일별 CSV/MD 사본 디렉터리 (기본 config output.daily_dir, 없으면 생략)")
     ap.add_argument("--result-json", default=None, help="실행 요약 JSON 경로 (검증 워크플로용)")
     return ap
 
@@ -274,13 +282,15 @@ def main(argv: list[str] | None = None) -> int:
     markets = args.markets.split(",") if args.markets else None
     periods = args.periods.split(",") if args.periods else None
     fetcher = Fetcher(config, cache_dir=args.cache_dir)
+    base_date = args.base_date or today_kst()
     try:
-        result = run(config, fetcher, args.base_date, markets=markets, periods=periods, top_n=args.top_n)
+        result = run(config, fetcher, base_date, markets=markets, periods=periods, top_n=args.top_n)
     except KRXCredentialsError as e:
         print(str(e), file=sys.stderr)
         return EXIT_CREDENTIALS
 
-    paths = write_outputs(result, config, output_dir=args.output_dir, sqlite_path=args.sqlite_path, write_db=not args.no_db)
+    paths = write_outputs(result, config, output_dir=args.output_dir, sqlite_path=args.sqlite_path,
+                          write_db=not args.no_db, daily_dir=args.daily_dir)
     summary = result.as_dict()
     summary["paths"] = paths
     summary["run_at"] = dt.datetime.now().isoformat(timespec="seconds")

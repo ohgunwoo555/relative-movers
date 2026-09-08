@@ -6,3 +6,4 @@ venv/
 data/
 outputs/
 docs/results/*.log
+docs/results/*.db

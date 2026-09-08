@@ -22,7 +22,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from src.calendar import all_windows, resolve_base_date  # noqa: E402
+from src.calendar import today_kst, all_windows, resolve_base_date  # noqa: E402
 from src.fetch import Fetcher, KRXCredentialsError, KRXUnavailableError  # noqa: E402
 from src.universe import administrative_from_sect, build_universe  # noqa: E402
 
@@ -52,7 +52,7 @@ def load_json(path: Path):
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--base-date", default=dt.date.today().strftime("%Y%m%d"))
+    ap.add_argument("--base-date", default=today_kst())
     ap.add_argument("--cache-dir", default=None)
     ap.add_argument("--config", default=str(ROOT / "config.yaml"))
     args = ap.parse_args()
@@ -156,8 +156,6 @@ def _finish(summary: dict, fetcher: Fetcher, total_t0: float, T: str | None) -> 
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
     text = json.dumps(summary, ensure_ascii=False, indent=2, default=str)
     (RESULTS_DIR / "fetch_result.json").write_text(text, encoding="utf-8")
-    if T:
-        (RESULTS_DIR / f"fetch_result_{T}.json").write_text(text, encoding="utf-8")
     print("\n=== 요약 ===")
     for mk, m in summary.get("markets", {}).items():
         if "steps" in m:

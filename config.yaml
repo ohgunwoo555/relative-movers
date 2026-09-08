@@ -35,8 +35,10 @@ fetch:
 output:
   dir: outputs
   formats: [csv, md]
-  sqlite_path: data/movers.db
+  sqlite_path: data/movers.db      # 로컬 파생물. git 에 넣지 않음 — scripts/rebuild_db.py 로 daily CSV 에서 재구성
+  daily_dir: docs/results/daily    # 일별 CSV/MD 사본 (git 커밋 대상, 원본 이력)
 
 notify:
-  enabled: false
+  enabled: true                    # SLACK_WEBHOOK_URL 환경변수가 없으면 경고 후 생략
   channel: slack
+  top_k: 5                         # 조합별 상위/하위 종목 수

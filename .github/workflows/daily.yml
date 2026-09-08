@@ -1,0 +1,100 @@
+name: daily
+
+# 운영 cron: 매일 07:00 KST (= 22:00 UTC 전날). 실행일은 KST 날짜(src/calendar.today_kst)로 잡으므로
+# GitHub cron 이 수십 분 지연돼도 같은 KST 날짜 안이면 T 는 동일하다. 휴장일이면 exit 3 → 성공 처리(알림 없음).
+on:
+  schedule:
+    - cron: "0 22 * * *"
+  workflow_dispatch:
+    inputs:
+      base_date: {description: "실행일 YYYYMMDD (기본 오늘 KST)", default: "", required: false}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: daily-run
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Run relative-movers
+        id: run
+        env:
+          KRX_ID: ${{ secrets.KRX_ID }}
+          KRX_PW: ${{ secrets.KRX_PW }}
+          PYTHONUNBUFFERED: "1"
+        run: |
+          mkdir -p docs/results/daily
+          echo "runner UTC: $(date -u +%FT%TZ) · KST: $(TZ=Asia/Seoul date +%FT%T)"
+          set +e
+          python -m src.main \
+            --no-db \
+            --daily-dir docs/results/daily \
+            --result-json docs/results/main_result.json \
+            $([ -n "${{ inputs.base_date }}" ] && echo --base-date "${{ inputs.base_date }}") \
+            2>&1 | tee docs/results/daily.log
+          rc=${PIPESTATUS[0]}
+          set -e
+          echo "exit_code=$rc" >> "$GITHUB_OUTPUT"
+          T=$(python -c "import json; print(json.load(open('docs/results/main_result.json')).get('T') or '')" 2>/dev/null || true)
+          echo "T=$T" >> "$GITHUB_OUTPUT"
+          # 3 = 휴장일: 정상 종료. 1 = 실패: 잡을 실패로 표시하되 알림·커밋은 계속 진행
+          if [ "$rc" = "3" ]; then exit 0; fi
+          exit $rc
+      - name: Summarize
+        if: always()
+        run: |
+          {
+            echo "## daily (exit ${{ steps.run.outputs.exit_code }}) — T=${{ steps.run.outputs.T }}"
+            echo
+            python scripts/summarize_result.py main || echo "_결과 JSON 없음 — 로그 artifact 참고_"
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Commit daily results
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/results/daily docs/results/main_result.json
+          if git diff --cached --quiet; then
+            echo "no result changes"
+          else
+            git commit -m "daily: T=${{ steps.run.outputs.T }} run ${{ github.run_number }} (exit ${{ steps.run.outputs.exit_code }})"
+            git pull --rebase origin "${{ github.ref_name }}"
+            git push origin "HEAD:${{ github.ref_name }}"
+          fi
+      - name: Notify Slack
+        if: always()
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          if [ ! -f docs/results/main_result.json ]; then echo "결과 JSON 없음 — 알림 생략"; exit 0; fi
+          python -m src.notify \
+            --result-json docs/results/main_result.json \
+            --run-url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            --results-url "${{ github.server_url }}/${{ github.repository }}/blob/${{ github.ref_name }}/docs/results/daily/${{ steps.run.outputs.T }}.md"
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: daily-${{ steps.run.outputs.T || github.run_number }}
+          path: |
+            docs/results/main_result.json
+            docs/results/daily.log
+            outputs/**
+          if-no-files-found: warn
+          retention-days: 30

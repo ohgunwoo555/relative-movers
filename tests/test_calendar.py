@@ -133,3 +133,12 @@ def test_as_iso():
     w = period_window("1d", "20260907", CONFIG_PERIODS["1d"], fake_nearest)
     assert w.as_iso() == {"period": "1d", "base_date": "2026-09-07",
                           "start_date": "2026-09-07", "base_price_date": "2026-09-04"}
+
+
+def test_today_kst_uses_seoul_date():
+    from src.calendar import KST, today_kst
+    now = dt.datetime.now(KST)
+    assert today_kst() == now.strftime("%Y%m%d")
+    # 22:00 UTC = 다음날 07:00 KST — UTC 날짜와 다르다
+    utc_2200 = dt.datetime(2026, 9, 8, 22, 30, tzinfo=dt.timezone.utc)
+    assert utc_2200.astimezone(KST).strftime("%Y%m%d") == "20260909" and utc_2200.strftime("%Y%m%d") == "20260908"

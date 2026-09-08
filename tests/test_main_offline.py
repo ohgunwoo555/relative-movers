@@ -9,6 +9,8 @@ import sqlite3
 import pandas as pd
 import pytest
 
+from pathlib import Path
+
 from src import main as m
 from src.calc import RESULT_COLUMNS
 from src.fetch import Fetcher
@@ -148,3 +150,31 @@ def test_cli_main_end_to_end(env, monkeypatch):
     # 휴장일 → exit 3
     with contextlib.redirect_stdout(io.StringIO()):
         assert m.main(["--base-date", "20260906", "--config", str(cfg_path)]) == 3
+
+
+def test_daily_dir_copies_and_no_db(env):
+    tmp_path, config, _ = env
+    res = m.run(config, Fetcher(config), "20260908", top_n=1)
+    paths = m.write_outputs(res, config, daily_dir=tmp_path / "daily", write_db=False)
+    assert "sqlite" not in paths
+    assert Path(paths["daily_csv"]).name == f"{fp.T}.csv" and Path(paths["daily_md"]).name == f"{fp.T}.md"
+    back = pd.read_csv(paths["daily_csv"], dtype={"ticker": str}, encoding="utf-8-sig")
+    assert len(back) == 20 and list(back.columns) == RESULT_COLUMNS
+    assert Path(paths["daily_md"]).read_text(encoding="utf-8") == Path(paths["md"]).read_text(encoding="utf-8")
+
+
+def test_cli_default_base_date_is_kst_today(env, monkeypatch):
+    tmp_path, config, _ = env
+    import yaml
+    cfg_path = tmp_path / "config.yaml"
+    cfg_path.write_text(yaml.safe_dump(config, allow_unicode=True), encoding="utf-8")
+    seen = {}
+
+    def fake_run(config, fetcher, base_date, **kw):
+        seen["base_date"] = base_date
+        return m.RunResult(base_date=base_date, T=None, note="휴장일")
+    monkeypatch.setattr(m, "run", fake_run)
+    monkeypatch.setattr(m, "today_kst", lambda: "20991231")
+    with contextlib.redirect_stdout(io.StringIO()):
+        m.main(["--config", str(cfg_path)])
+    assert seen["base_date"] == "20991231"

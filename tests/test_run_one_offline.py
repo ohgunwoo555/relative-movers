@@ -154,7 +154,7 @@ def test_kospi_1d_end_to_end(run, tmp_path):
                                    "start_close", "end_close", "stock_ret", "market_ret", "excess_ret", "market_cap", "trading_value"]
     assert "### up 3" in out and "| 1 | 058430 | 포스코스틸리온 |" in out
     assert (tmp_path / "outputs" / T / "movers_KOSPI_1d.csv").exists()
-    assert (tmp_path / "results" / f"calc_result_{T}_KOSPI_1d.json").exists()
+    assert not (tmp_path / "results" / f"calc_result_{T}_KOSPI_1d.json").exists()   # 날짜별 사본은 두지 않는다
     # summarize 가 calc JSON 을 읽는다
     sr = load(SUMMARIZE, "summarize_under_test"); sr.RESULTS = tmp_path / "results"
     buf = io.StringIO()

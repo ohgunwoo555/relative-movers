@@ -81,8 +81,8 @@ SQLite 테이블 `movers`는 동일 스키마, PK = `(base_date, market, period,
 2. ✅ calendar.py + universe.py + 테스트 (관리종목 소스는 `validate_universe` 워크플로 결과로 확정 — docs/administrative_issue.md)
 3. ✅ fetch.py (캐시·재시도) — 관리종목 KIND 경로는 `validate_fetch` 워크플로 결과로 확정
 4. ✅ calc.py + rank.py — (KOSPI, 1d) `validate_calc` 실측 검증 완료 (2026-09-08, market_ret +4.61%, 801종목)
-5. **진행 중** report.py + main.py 작성 완료 — `validate_main` 워크플로로 전체 실행 검증 후 1y 소요시간을 docs/stage1_validation.md 4-1절에 기입
-6. notify.py + 스케줄러
+5. ✅ report.py + main.py — `validate_main` 실측 10/10 조합 성공 (2026-09-08, 79.5초)
+6. ✅ notify.py + 스케줄러 (`daily.yml`, 07:00 KST) — 첫 cron 실행과 Slack 수신 확인 후 완료 처리
 7. 백필 (선택)
 
 ## 8. 개발 관례
@@ -102,15 +102,18 @@ SQLite 테이블 `movers`는 동일 스키마, PK = `(base_date, market, period,
 - 오케스트레이션은 `src/main.py`(`run` → `write_outputs`)에만 있다. `scripts/run_one.py`는 `run(markets=[m], periods=[p])`를 호출하는 얇은 래퍼.
   전체 실행은 `python -m src.main`. 종료코드 0/1/2/3 은 DESIGN.md 6절. 한 조합 실패는 `ComboResult.error`에 담고 나머지는 계속 진행한다.
 - `src/report.py`: CSV(utf-8-sig)·Markdown·SQLite `INSERT OR REPLACE`(PK 교체, `updated_at` 컬럼 추가). 계산 금지.
-- 워크플로 `validate_main`은 SQLite를 `docs/results/movers.db`에 두어 git으로 누적하고, `movers_<T>.csv/.md`와 `main_result_<T>.json`을 커밋한다.
+- **DB는 git에 커밋하지 않는다.** 일별 결과 원본은 `docs/results/daily/<T>.csv|.md`(main.py `--daily-dir`)이고,
+  `data/movers.db`는 `scripts/rebuild_db.py`로 daily/ 전체에서 재구성하는 파생물이다. 워크플로는 `--no-db`로 돌린다.
+- 실행일 기본값은 `calendar.today_kst()`(KST 날짜). `date.today()`를 쓰지 않는다 (UTC 러너에서 T가 하루 밀림).
+- `src/notify.py`: `SLACK_WEBHOOK_URL` 없으면 경고 후 생략, 휴장일은 생략, 실패는 원인 분류를 담아 발송. 테스트는 `http_post`·`env` 주입.
 - `src/fetch.py`의 `Fetcher`가 유일한 네트워크 진입점이다. pykrx는 `_pykrx()`에서 지연 import하고 `KRX_ID/KRX_PW` 없음은
   `KRXCredentialsError`, 접속·재시도 실패는 `KRXUnavailableError`. 캐시는 `data/cache/<날짜>/<엔드포인트>__<인자>.json`.
   import 실패(KRX가 JSON 대신 HTML 응답 → JSONDecodeError)도 재시도·백오프하며, 최종 실패는 `diagnose_krx_failure`로
   점검/차단/자격증명/unknown을 분류해 `KRXUnavailableError.diagnosis`에 담는다. 스크립트는 이를 결과 JSON `failure`에 써서 Summary 맨 위에 보인다.
   pykrx는 자격증명 오류를 print만 하므로 import 직후 `_check_authenticated`로 세션 인증 여부를 확인한다.
   테스트는 `pykrx_ns`, `sleep_fn`, `http_post`, `env`를 주입한다(tests/test_fetch.py 참고).
-- 검증 결과 JSON은 `docs/results/<kind>_result.json`(최신) + `<kind>_result_<T>.json`(이력)에 남기고 워크플로가 main에 커밋한다.
-  다음 검증 스크립트는 이 파일로 개수를 자동 대조한다. 로그(`*.log`)는 artifact에만.
+- 검증 결과 JSON은 `docs/results/<kind>_result.json`(최신만)에 남기고 워크플로가 main에 커밋한다. 이력은 `docs/results/daily/`가 담당한다.
+  다음 검증 스크립트는 이 파일로 개수를 자동 대조한다. 로그(`*.log`)와 DB(`*.db`)는 커밋하지 않는다.
 - git: 별도 브랜치 없이 `main`에 직접 커밋·푸시한다(사용자 지시, 2026-09-08). 워크플로 봇 커밋과 충돌하면 `git pull --rebase`.
 - 테스트는 `tests/`에 pytest. 네트워크 호출은 캐시 픽스처로 대체하고 실제 KRX 호출 테스트는 별도 마크.
 - 날짜는 내부적으로 `YYYYMMDD` 문자열(pykrx 규약)로 통일하고, 출력 스키마에서는 `YYYY-MM-DD`.

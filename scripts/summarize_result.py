@@ -97,7 +97,7 @@ def main(kind: str) -> int:
         for f in r.get("failures", []):
             print(f"- ❌ {f['market']} {f['period']}: [{f.get('error_class')}] {f.get('error')}")
         print(f"- 공통 타이밍: `{r.get('timings')}` · paths `{r.get('paths')}`")
-        md = RESULTS / "movers.md"
+        md = RESULTS / "daily" / f"{r.get('T')}.md"
         if md.exists():
             print("\n---\n")
             print(md.read_text(encoding="utf-8"))

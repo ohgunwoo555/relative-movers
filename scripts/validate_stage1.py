@@ -120,7 +120,7 @@ def pct(a: float, b: float) -> float:
 def main() -> int:
     global _stock
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--base-date", default=ymd(dt.date.today()), help="실행일 YYYYMMDD (기본 오늘)")
+    ap.add_argument("--base-date", default=(dt.datetime.now(dt.timezone(dt.timedelta(hours=9)))).strftime("%Y%m%d"), help="실행일 YYYYMMDD (기본 오늘, KST)")
     ap.add_argument("--split-ticker", default="058430", help="최근 1년 내 액면분할 종목코드 (기본 포스코스틸리온)")
     ap.add_argument("--split-name", default="포스코스틸리온", help="종목명 (종목코드 교차확인용)")
     ap.add_argument("--split-date", default="20260423", help="분할 신주 변경상장일 YYYYMMDD")
@@ -354,8 +354,6 @@ def _finish(summary: dict, total_t0: float) -> int:
     RESULT_JSON.parent.mkdir(parents=True, exist_ok=True)
     text = json.dumps(summary, ensure_ascii=False, indent=2, default=str)
     RESULT_JSON.write_text(text, encoding="utf-8")
-    if summary.get("T"):
-        (RESULT_JSON.parent / f"stage1_result_{summary['T']}.json").write_text(text, encoding="utf-8")
     print("\n| call | ok | sec | rows |\n|---|---|---|---|")
     for r in results:
         print(f"| {r['call']} | {r['ok']} | {r['sec']} | {r['rows']} |")

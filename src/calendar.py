@@ -19,6 +19,14 @@ import datetime as dt
 from dataclasses import dataclass
 from typing import Callable, Mapping
 
+KST = dt.timezone(dt.timedelta(hours=9))
+
+
+def today_kst() -> str:
+    """실행일(YYYYMMDD)은 **KST 날짜** 기준. GitHub Actions 러너는 UTC 라 `date.today()` 를 쓰면 22:00 UTC 실행 시 전날이 된다."""
+    return dt.datetime.now(KST).strftime("%Y%m%d")
+
+
 NearestBday = Callable[[str, bool], str]
 """(date_yyyymmdd, prev) -> 거래일 yyyymmdd. prev=True: 이전(포함) / False: 이후(포함)."""
 

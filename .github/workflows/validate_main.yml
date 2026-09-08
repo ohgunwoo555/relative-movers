@@ -1,6 +1,6 @@
 name: validate_main
 
-# 5단계 검증 / 본 실행: 2시장 × 5기간 전체 → movers.md 를 Summary 에, csv·md·db 를 artifact 와 docs/results 에
+# 5단계 검증: 2시장 × 5기간 전체 → movers.md 를 Summary 에, 일별 csv·md 를 docs/results/daily 에 커밋 (DB 는 커밋하지 않음)
 on:
   workflow_dispatch:
     inputs:
@@ -39,7 +39,8 @@ jobs:
           mkdir -p docs/results
           set +e
           python -m src.main \
-            --sqlite-path docs/results/movers.db \
+            --no-db \
+            --daily-dir docs/results/daily \
             --result-json docs/results/main_result.json \
             $([ -n "${{ inputs.base_date }}" ] && echo --base-date "${{ inputs.base_date }}") \
             $([ -n "${{ inputs.markets }}" ] && echo --markets "${{ inputs.markets }}") \
@@ -48,15 +49,6 @@ jobs:
           rc=${PIPESTATUS[0]}
           set -e
           echo "exit_code=$rc" >> "$GITHUB_OUTPUT"
-          # 결과 사본: docs/results/movers_<T>.csv/.md, 최신은 movers.csv/.md
-          T=$(python -c "import json,sys; print(json.load(open('docs/results/main_result.json')).get('T') or '')" 2>/dev/null || true)
-          if [ -n "$T" ] && [ -d "outputs/$T" ]; then
-            cp "outputs/$T/movers.csv" "docs/results/movers_$T.csv" 2>/dev/null || true
-            cp "outputs/$T/movers.md"  "docs/results/movers_$T.md"  2>/dev/null || true
-            cp "outputs/$T/movers.csv" docs/results/movers.csv 2>/dev/null || true
-            cp "outputs/$T/movers.md"  docs/results/movers.md  2>/dev/null || true
-            cp docs/results/main_result.json "docs/results/main_result_$T.json"
-          fi
           exit $rc
       - name: Summarize
         if: always()
@@ -72,10 +64,8 @@ jobs:
         with:
           name: validate_main-${{ github.run_number }}
           path: |
-            docs/results/main_result*.json
-            docs/results/movers*.csv
-            docs/results/movers*.md
-            docs/results/movers.db
+            docs/results/main_result.json
+            docs/results/daily/*
             docs/results/validate_main.log
             outputs/**
           if-no-files-found: warn

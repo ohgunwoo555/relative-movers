@@ -21,6 +21,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
+from src.calendar import today_kst  # noqa: E402
 from src.fetch import Fetcher, KRXCredentialsError  # noqa: E402
 from src.main import EXIT_CREDENTIALS, load_config, run  # noqa: E402
 from src.rank import to_markdown_table  # noqa: E402
@@ -34,7 +35,7 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--market", default="KOSPI", choices=["KOSPI", "KOSDAQ"])
     ap.add_argument("--period", default="1d")
-    ap.add_argument("--base-date", default=dt.date.today().strftime("%Y%m%d"))
+    ap.add_argument("--base-date", default=today_kst())
     ap.add_argument("--top-n", type=int, default=None)
     ap.add_argument("--config", default=str(ROOT / "config.yaml"))
     ap.add_argument("--cache-dir", default=None)
@@ -87,8 +88,6 @@ def main() -> int:
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
     text = json.dumps(summary, ensure_ascii=False, indent=2, default=str)
     (RESULTS_DIR / "calc_result.json").write_text(text, encoding="utf-8")
-    if res.T:
-        (RESULTS_DIR / f"calc_result_{res.T}_{args.market}_{args.period}.json").write_text(text, encoding="utf-8")
     print(f"\ntotal {summary['total_sec']}s · fetch {res.fetch_stats} → {RESULTS_DIR / 'calc_result.json'}")
     return res.exit_code
 

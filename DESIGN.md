@@ -79,8 +79,9 @@ relative-movers/
 │   ├── report.py        # CSV/JSON/Markdown
 │   ├── notify.py        # Slack 발송 (선택)
 │   └── main.py
-├── data/cache/, data/movers.db
-├── outputs/YYYY-MM-DD/
+├── data/cache/, data/movers.db   # 로컬 파생물 (git 제외). DB는 scripts/rebuild_db.py로 daily CSV에서 재구성
+├── outputs/YYYY-MM-DD/           # 로컬 산출물 (git 제외)
+├── docs/results/daily/<T>.csv|.md  # 일별 결과 원본 (git 커밋, 이력)
 └── tests/
 ```
 
@@ -92,7 +93,8 @@ relative-movers/
    - 유니버스와 inner join (신규상장 자동 탈락)
    - 초과수익률 계산 → 거래대금 필터 → 상위 N / 하위 N
 4. 20개 랭킹을 long-format 테이블로 통합
-5. `outputs/T/movers.csv`, `movers.md` 저장 + SQLite 누적(`INSERT OR REPLACE`, PK 기준 교체) + 알림
+5. `outputs/T/movers.csv`, `movers.md` 저장 + `docs/results/daily/<T>.csv|.md` 사본(git 커밋) + SQLite 누적(로컬, `INSERT OR REPLACE`) + Slack 알림
+   - **DB는 커밋하지 않는다** (2026-09-08 설계 변경). 일별 CSV가 원본이며 `scripts/rebuild_db.py`가 daily/ 전체를 읽어 DB를 재구성한다
 
 종료코드: 0 전부 성공 / 1 일부·전부 실패(한 조합 실패 시 나머지는 계속 진행하고 성공분은 저장, 실패 목록·원인 분류를 마지막에 보고) /
 2 자격증명 없음 / 3 휴장일. 유니버스·시총은 시장당 1회, ETF/ETN 목록은 실행당 1회만 조회한다
@@ -127,12 +129,14 @@ SQLite 테이블 `movers`는 동일 스키마. PK = (base_date, market, period, 
   **점검 / 차단 / 자격증명 / unknown** 으로 분류하고 HTTP 상태·응답 본문 앞 300자를 로그·결과 JSON(`failure`)·Summary에 남긴 뒤 exit 1
 
 ## 9. 스케줄링
-- **확정: 1안 GitHub Actions cron** (매일 07:00 KST = `0 22 * * *` UTC).
+- **확정: 1안 GitHub Actions cron** (매일 07:00 KST = `0 22 * * *` UTC, `.github/workflows/daily.yml`).
+  실행일은 러너 시각이 아니라 **KST 날짜**(`calendar.today_kst`)로 잡는다. 러너는 UTC라 `date.today()`를 쓰면 22:00 UTC 실행 시 전날이 되어 T가 하루 밀린다.
+  GitHub cron이 수십 분 지연돼도 같은 KST 날짜 안이면 T는 같다. 실행 후 daily CSV·MD 커밋 → Slack 알림(실패 시 원인 분류 포함) 순서.
   2026-09-08 `validate_stage1` 워크플로 실측으로 `ubuntu-latest` 러너(해외 IP)에서 KRX 로그인·조회가 정상임을 확인
   (해외 IP 차단 없음, 검증 스크립트 62.7초). 휴장일에는 main.py가 T 판정 단계에서 즉시 종료하므로 매일 실행해도 된다.
 - 2안 launchd (Mac)는 GitHub Actions 장애·KRX 정책 변경 시 백업. 로컬 실행
 - main.py는 동일, 실행 환경만 다름. 결과(`outputs/`, `data/movers.db`)는 Actions artifact 또는 별도 브랜치/스토리지로 보존(6단계에서 결정)
-- **시크릿 관리**: `KRX_ID`/`KRX_PW`(및 Slack 토큰)는
+- **시크릿 관리**: `KRX_ID`/`KRX_PW`, `SLACK_WEBHOOK_URL`(Incoming Webhook, 없으면 알림 생략 후 경고)는
   GitHub Actions → 리포지토리 **Secrets**(`secrets.KRX_ID`, `secrets.KRX_PW`)를 `env`로 주입,
   launchd → git에 넣지 않는 **환경변수 파일**(예: `~/.config/relative-movers/env`, `.gitignore`의 `.env`)을
   plist `EnvironmentVariables` 또는 실행 래퍼 스크립트에서 `source`하여 공급. 코드·config·로그에 자격증명을 남기지 않는다
