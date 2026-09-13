@@ -1,24 +1,34 @@
 {
-  "base_date": "20260913",
+  "base_date": "20260914",
   "T": null,
-  "note": "20260913 는 휴장일(주말) — 종료 (exit 3)",
+  "note": null,
   "top_n": 20,
-  "exit_code": 3,
-  "total_sec": 0.0,
+  "exit_code": 1,
+  "total_sec": 31.8,
   "combos": [],
   "failures": [],
   "universes": {},
-  "warnings": [],
-  "failure": null,
+  "warnings": [
+    "KRX 접근 불가 [차단]: pykrx import/KRX 로그인 3회 실패 [차단] HTTP 403 | JSONDecodeError: Expecting value: line 1 column 1 (char 0) | body(exception.doc): <HTML><HEAD> <TITLE>Access Denied</TITLE> </HEAD><BODY> <H1>Access Denied</H1> You don't have permission to access \"http&#58;&#47;&#47;data&#46;krx&#46;co&#46;kr&#47;contents&"
+  ],
+  "failure": {
+    "classification": "차단",
+    "http_status": 403,
+    "body_head": "<HTML><HEAD> <TITLE>Access Denied</TITLE> </HEAD><BODY> <H1>Access Denied</H1> You don't have permission to access \"http&#58;&#47;&#47;data&#46;krx&#46;co&#46;kr&#47;contents&#47;MDC&#47;COMS&#47;client&#47;MDCCOMS001D1&#46;cmd\" on this server.<P> Reference&#32;&#35;18&#46;c9263e17&#46;1789343296&#4",
+    "body_source": "exception.doc",
+    "exception": "JSONDecodeError: Expecting value: line 1 column 1 (char 0)",
+    "probe_error": null,
+    "error": "pykrx import/KRX 로그인 3회 실패 [차단] HTTP 403 | JSONDecodeError: Expecting value: line 1 column 1 (char 0) | body(exception.doc): <HTML><HEAD> <TITLE>Access Denied</TITLE> </HEAD><BODY> <H1>Access Denied</H1> You don't have permission to access \"http&#58;&#47;&#47;data&#46;krx&#46;co&#46;kr&#47;contents&#47;MDC&#47;COMS&#47;client&#47;MDCCOMS001D1&#46;cmd\" on this server.<P> Reference&#32;&#35;18&#46;c9263e17&#46;1789343296&#4"
+  },
   "timings": {
-    "resolve_base_date": 0.0
+    "resolve_base_date": 31.83
   },
   "fetch_stats": {
     "network_calls": 0,
     "cache_hits": 0,
-    "retries": 0
+    "retries": 3
   },
   "n_movers_rows": 0,
   "paths": {},
-  "run_at": "2026-09-12T23:35:33"
+  "run_at": "2026-09-13T23:48:16"
 }
