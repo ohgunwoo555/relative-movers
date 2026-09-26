@@ -1,24 +1,24 @@
 {
-  "base_date": "20260925",
+  "base_date": "20260926",
   "T": null,
-  "note": "T=20260923 는 이미 산출됨 (20260925 는 휴장일이거나 재실행) — 종료 (exit 3). 재산출은 --force",
+  "note": "20260926 는 휴장일(주말) — 종료 (exit 3)",
   "top_n": 20,
   "exit_code": 3,
-  "total_sec": 4.2,
+  "total_sec": 0.0,
   "combos": [],
   "failures": [],
   "universes": {},
   "warnings": [],
   "failure": null,
   "timings": {
-    "resolve_base_date": 4.16
+    "resolve_base_date": 0.0
   },
   "fetch_stats": {
-    "network_calls": 1,
+    "network_calls": 0,
     "cache_hits": 0,
     "retries": 0
   },
   "n_movers_rows": 0,
   "paths": {},
-  "run_at": "2026-09-25T00:10:27"
+  "run_at": "2026-09-26T00:16:25"
 }
