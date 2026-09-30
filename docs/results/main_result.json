@@ -1,24 +1,24 @@
 {
-  "base_date": "20260929",
-  "T": "20260928",
+  "base_date": "20260930",
+  "T": "20260929",
   "note": null,
   "top_n": 20,
   "exit_code": 0,
-  "total_sec": 96.8,
+  "total_sec": 102.5,
   "combos": [
     {
       "market": "KOSPI",
       "period": "1d",
       "ok": true,
       "window": {
-        "ref_date": "20260928",
-        "from": "20260928",
-        "base_date": "20260923"
+        "ref_date": "20260929",
+        "from": "20260929",
+        "base_date": "20260928"
       },
-      "from": "20260928",
-      "base_date": "20260923",
+      "from": "20260929",
+      "base_date": "20260928",
       "n_calc_rows": 803,
-      "market_ret": -2.699931647300069,
+      "market_ret": -0.2747563768734307,
       "inputs": {
         "n_price_change": 942,
         "n_delisted_rows": 0,
@@ -27,20 +27,20 @@
       },
       "excess_stats": {
         "count": 803.0,
-        "mean": 3.642,
-        "std": 2.71,
-        "min": -7.625,
-        "25%": 2.576,
-        "50%": 3.434,
-        "75%": 4.571,
-        "max": 32.517
+        "mean": -0.717,
+        "std": 3.984,
+        "min": -92.112,
+        "25%": -1.672,
+        "50%": -0.479,
+        "75%": 0.347,
+        "max": 12.711
       },
       "error": null,
       "error_class": null,
       "timings": {
-        "window": 1.28,
-        "index_ohlcv": 11.69,
-        "price_change": 3.45,
+        "window": 1.33,
+        "index_ohlcv": 14.85,
+        "price_change": 2.68,
         "calc": 0.01,
         "rank": 0.01
       },
@@ -51,14 +51,14 @@
       "period": "1w",
       "ok": true,
       "window": {
-        "ref_date": "20260921",
-        "from": "20260921",
-        "base_date": "20260918"
+        "ref_date": "20260922",
+        "from": "20260922",
+        "base_date": "20260921"
       },
-      "from": "20260921",
-      "base_date": "20260918",
-      "n_calc_rows": 805,
-      "market_ret": -0.0651269249792863,
+      "from": "20260922",
+      "base_date": "20260921",
+      "n_calc_rows": 806,
+      "market_ret": -1.953702488113107,
       "inputs": {
         "n_price_change": 942,
         "n_delisted_rows": 0,
@@ -66,21 +66,21 @@
         "n_market_cap": 942
       },
       "excess_stats": {
-        "count": 805.0,
-        "mean": -0.081,
-        "std": 5.347,
-        "min": -22.206,
-        "25%": -2.097,
-        "50%": -0.243,
-        "75%": 1.351,
-        "max": 70.408
+        "count": 806.0,
+        "mean": 1.4,
+        "std": 6.622,
+        "min": -90.433,
+        "25%": -0.483,
+        "50%": 1.475,
+        "75%": 2.892,
+        "max": 80.332
       },
       "error": null,
       "error_class": null,
       "timings": {
-        "window": 2.57,
-        "index_ohlcv": 1.26,
-        "price_change": 2.5,
+        "window": 2.58,
+        "index_ohlcv": 1.32,
+        "price_change": 2.99,
         "calc": 0.01,
         "rank": 0.01
       },
@@ -91,36 +91,36 @@
       "period": "1m",
       "ok": true,
       "window": {
-        "ref_date": "20260828",
-        "from": "20260828",
-        "base_date": "20260827"
+        "ref_date": "20260829",
+        "from": "20260831",
+        "base_date": "20260828"
       },
-      "from": "20260828",
-      "base_date": "20260827",
-      "n_calc_rows": 810,
-      "market_ret": -0.3273840954694296,
+      "from": "20260831",
+      "base_date": "20260828",
+      "n_calc_rows": 811,
+      "market_ret": 1.2068264573832588,
       "inputs": {
-        "n_price_change": 944,
-        "n_delisted_rows": 2,
+        "n_price_change": 943,
+        "n_delisted_rows": 1,
         "index_rows": 21,
         "n_market_cap": 942
       },
       "excess_stats": {
-        "count": 810.0,
-        "mean": -0.434,
-        "std": 11.368,
-        "min": -54.673,
-        "25%": -5.485,
-        "50%": -1.522,
-        "75%": 2.429,
-        "max": 92.913
+        "count": 811.0,
+        "mean": -3.921,
+        "std": 12.286,
+        "min": -93.594,
+        "25%": -9.096,
+        "50%": -5.165,
+        "75%": -0.701,
+        "max": 110.739
       },
       "error": null,
       "error_class": null,
       "timings": {
-        "window": 2.64,
-        "index_ohlcv": 1.28,
-        "price_change": 3.3,
+        "window": 2.63,
+        "index_ohlcv": 1.36,
+        "price_change": 4.01,
         "calc": 0.01,
         "rank": 0.01
       },
@@ -131,36 +131,36 @@
       "period": "6m",
       "ok": true,
       "window": {
-        "ref_date": "20260328",
+        "ref_date": "20260329",
         "from": "20260330",
         "base_date": "20260327"
       },
       "from": "20260330",
       "base_date": "20260327",
-      "n_calc_rows": 812,
-      "market_ret": 26.6759455548671,
+      "n_calc_rows": 813,
+      "market_ret": 26.32789531649038,
       "inputs": {
         "n_price_change": 950,
         "n_delisted_rows": 10,
-        "index_rows": 124,
+        "index_rows": 125,
         "n_market_cap": 942
       },
       "excess_stats": {
-        "count": 812.0,
-        "mean": -36.834,
-        "std": 34.365,
-        "min": -103.968,
-        "25%": -54.066,
-        "50%": -41.499,
-        "75%": -28.198,
-        "max": 368.088
+        "count": 813.0,
+        "mean": -37.246,
+        "std": 35.118,
+        "min": -118.715,
+        "25%": -54.448,
+        "50%": -41.558,
+        "75%": -29.089,
+        "max": 391.487
       },
       "error": null,
       "error_class": null,
       "timings": {
-        "window": 2.58,
-        "index_ohlcv": 1.31,
-        "price_change": 3.45,
+        "window": 2.61,
+        "index_ohlcv": 1.34,
+        "price_change": 5.5,
         "calc": 0.01,
         "rank": 0.01
       },
@@ -171,36 +171,36 @@
       "period": "1y",
       "ok": true,
       "window": {
-        "ref_date": "20250928",
+        "ref_date": "20250929",
         "from": "20250929",
         "base_date": "20250926"
       },
       "from": "20250929",
       "base_date": "20250926",
-      "n_calc_rows": 814,
-      "market_ret": 103.47425466251235,
+      "n_calc_rows": 815,
+      "market_ret": 102.91519617253142,
       "inputs": {
         "n_price_change": 959,
         "n_delisted_rows": 24,
-        "index_rows": 242,
+        "index_rows": 243,
         "n_market_cap": 942
       },
       "excess_stats": {
-        "count": 814.0,
-        "mean": -95.595,
-        "std": 72.517,
-        "min": -188.669,
-        "25%": -127.873,
-        "50%": -109.913,
-        "75%": -87.632,
-        "max": 785.143
+        "count": 815.0,
+        "mean": -95.879,
+        "std": 73.724,
+        "min": -195.302,
+        "25%": -127.801,
+        "50%": -109.901,
+        "75%": -87.164,
+        "max": 831.76
       },
       "error": null,
       "error_class": null,
       "timings": {
-        "window": 2.56,
-        "index_ohlcv": 1.59,
-        "price_change": 5.67,
+        "window": 2.63,
+        "index_ohlcv": 1.37,
+        "price_change": 6.39,
         "calc": 0.01,
         "rank": 0.01
       },
@@ -211,36 +211,36 @@
       "period": "1d",
       "ok": true,
       "window": {
-        "ref_date": "20260928",
-        "from": "20260928",
-        "base_date": "20260923"
+        "ref_date": "20260929",
+        "from": "20260929",
+        "base_date": "20260928"
       },
-      "from": "20260928",
-      "base_date": "20260923",
-      "n_calc_rows": 1605,
-      "market_ret": 0.24867374005306253,
+      "from": "20260929",
+      "base_date": "20260928",
+      "n_calc_rows": 1607,
+      "market_ret": 0.38035389449313506,
       "inputs": {
-        "n_price_change": 1821,
+        "n_price_change": 1823,
         "n_delisted_rows": 0,
         "index_rows": 2,
-        "n_market_cap": 1821
+        "n_market_cap": 1823
       },
       "excess_stats": {
-        "count": 1605.0,
-        "mean": 0.596,
-        "std": 4.509,
-        "min": -30.942,
-        "25%": -1.201,
-        "50%": 0.108,
-        "75%": 1.519,
-        "max": 29.751
+        "count": 1607.0,
+        "mean": -0.915,
+        "std": 4.889,
+        "min": -30.345,
+        "25%": -2.524,
+        "50%": -1.099,
+        "75%": 0.142,
+        "max": 81.82
       },
       "error": null,
       "error_class": null,
       "timings": {
         "window": 0.0,
-        "index_ohlcv": 1.27,
-        "price_change": 2.93,
+        "index_ohlcv": 1.3,
+        "price_change": 2.77,
         "calc": 0.01,
         "rank": 0.01
       },
@@ -251,36 +251,36 @@
       "period": "1w",
       "ok": true,
       "window": {
-        "ref_date": "20260921",
-        "from": "20260921",
-        "base_date": "20260918"
+        "ref_date": "20260922",
+        "from": "20260922",
+        "base_date": "20260921"
       },
-      "from": "20260921",
-      "base_date": "20260918",
+      "from": "20260922",
+      "base_date": "20260921",
       "n_calc_rows": 1605,
-      "market_ret": 2.3527420446851854,
+      "market_ret": 1.6178985255957956,
       "inputs": {
-        "n_price_change": 1818,
+        "n_price_change": 1820,
         "n_delisted_rows": 0,
         "index_rows": 5,
-        "n_market_cap": 1821
+        "n_market_cap": 1823
       },
       "excess_stats": {
         "count": 1605.0,
-        "mean": -1.118,
-        "std": 9.35,
-        "min": -100.054,
-        "25%": -4.867,
-        "50%": -2.582,
-        "75%": 0.405,
-        "max": 114.518
+        "mean": -1.036,
+        "std": 8.942,
+        "min": -99.976,
+        "25%": -4.414,
+        "50%": -1.996,
+        "75%": 0.804,
+        "max": 146.234
       },
       "error": null,
       "error_class": null,
       "timings": {
         "window": 0.0,
-        "index_ohlcv": 1.28,
-        "price_change": 3.29,
+        "index_ohlcv": 1.36,
+        "price_change": 2.99,
         "calc": 0.01,
         "rank": 0.01
       },
@@ -291,36 +291,36 @@
       "period": "1m",
       "ok": true,
       "window": {
-        "ref_date": "20260828",
-        "from": "20260828",
-        "base_date": "20260827"
+        "ref_date": "20260829",
+        "from": "20260831",
+        "base_date": "20260828"
       },
-      "from": "20260828",
-      "base_date": "20260827",
+      "from": "20260831",
+      "base_date": "20260828",
       "n_calc_rows": 1613,
-      "market_ret": 1.0660777174237523,
+      "market_ret": 1.358523872568318,
       "inputs": {
         "n_price_change": 1823,
         "n_delisted_rows": 8,
         "index_rows": 21,
-        "n_market_cap": 1821
+        "n_market_cap": 1823
       },
       "excess_stats": {
         "count": 1613.0,
-        "mean": 2.019,
-        "std": 17.034,
-        "min": -98.767,
-        "25%": -6.469,
-        "50%": -0.952,
-        "75%": 6.654,
-        "max": 234.527
+        "mean": 0.596,
+        "std": 18.26,
+        "min": -99.716,
+        "25%": -8.427,
+        "50%": -2.62,
+        "75%": 5.504,
+        "max": 329.827
       },
       "error": null,
       "error_class": null,
       "timings": {
         "window": 0.0,
-        "index_ohlcv": 1.33,
-        "price_change": 3.72,
+        "index_ohlcv": 1.3,
+        "price_change": 3.99,
         "calc": 0.01,
         "rank": 0.01
       },
@@ -331,36 +331,36 @@
       "period": "6m",
       "ok": true,
       "window": {
-        "ref_date": "20260328",
+        "ref_date": "20260329",
         "from": "20260330",
         "base_date": "20260327"
       },
       "from": "20260330",
       "base_date": "20260327",
       "n_calc_rows": 1592,
-      "market_ret": -25.83683016355529,
+      "market_ret": -25.55474765880281,
       "inputs": {
         "n_price_change": 1821,
         "n_delisted_rows": 36,
-        "index_rows": 124,
-        "n_market_cap": 1821
+        "index_rows": 125,
+        "n_market_cap": 1823
       },
       "excess_stats": {
         "count": 1592.0,
-        "mean": 7.832,
-        "std": 38.593,
-        "min": -71.864,
-        "25%": -12.825,
-        "50%": 3.19,
-        "75%": 19.246,
-        "max": 555.101
+        "mean": 7.336,
+        "std": 39.886,
+        "min": -72.803,
+        "25%": -13.514,
+        "50%": 2.27,
+        "75%": 18.248,
+        "max": 614.065
       },
       "error": null,
       "error_class": null,
       "timings": {
         "window": 0.0,
-        "index_ohlcv": 1.32,
-        "price_change": 5.07,
+        "index_ohlcv": 1.38,
+        "price_change": 5.84,
         "calc": 0.01,
         "rank": 0.01
       },
@@ -371,36 +371,36 @@
       "period": "1y",
       "ok": true,
       "window": {
-        "ref_date": "20250928",
+        "ref_date": "20250929",
         "from": "20250929",
         "base_date": "20250926"
       },
       "from": "20250929",
       "base_date": "20250926",
       "n_calc_rows": 1561,
-      "market_ret": 1.3637615392904534,
+      "market_ret": 1.7493025539098817,
       "inputs": {
         "n_price_change": 1803,
         "n_delisted_rows": 68,
-        "index_rows": 242,
-        "n_market_cap": 1821
+        "index_rows": 243,
+        "n_market_cap": 1823
       },
       "excess_stats": {
         "count": 1561.0,
-        "mean": -3.515,
-        "std": 92.615,
-        "min": -99.065,
-        "25%": -40.472,
-        "50%": -20.564,
-        "75%": 7.29,
-        "max": 2299.984
+        "mean": -4.166,
+        "std": 91.395,
+        "min": -100.107,
+        "25%": -41.64,
+        "50%": -21.845,
+        "75%": 6.736,
+        "max": 2174.478
       },
       "error": null,
       "error_class": null,
       "timings": {
         "window": 0.0,
-        "index_ohlcv": 1.53,
-        "price_change": 5.46,
+        "index_ohlcv": 1.3,
+        "price_change": 6.85,
         "calc": 0.01,
         "rank": 0.01
       },
@@ -444,27 +444,27 @@
       "steps": [
         [
           "listed",
-          1821
+          1823
         ],
         [
           "-etf",
-          1821
+          1823
         ],
         [
           "-etn",
-          1821
+          1823
         ],
         [
           "-spac",
-          1750
+          1752
         ],
         [
           "-preferred",
-          1747
+          1749
         ],
         [
           "-administrative",
-          1622
+          1624
         ]
       ],
       "warnings": []
@@ -475,15 +475,15 @@
   ],
   "failure": null,
   "timings": {
-    "resolve_base_date": 4.28,
-    "etf_tickers": 3.5,
+    "resolve_base_date": 4.49,
+    "etf_tickers": 4.67,
     "etn_tickers": 1.0,
-    "KOSPI/listed": 1.83,
-    "KOSPI/administrative": 6.26,
-    "KOSPI/market_cap": 1.55,
-    "KOSDAQ/listed": 1.51,
+    "KOSPI/listed": 1.7,
+    "KOSPI/administrative": 2.49,
+    "KOSPI/market_cap": 1.57,
+    "KOSDAQ/listed": 1.88,
     "KOSDAQ/administrative": 0.0,
-    "KOSDAQ/market_cap": 2.36
+    "KOSDAQ/market_cap": 1.87
   },
   "fetch_stats": {
     "network_calls": 37,
@@ -492,10 +492,10 @@
   },
   "n_movers_rows": 400,
   "paths": {
-    "csv": "outputs/20260928/movers.csv",
-    "md": "outputs/20260928/movers.md",
-    "daily_csv": "docs/results/daily/20260928.csv",
-    "daily_md": "docs/results/daily/20260928.md"
+    "csv": "outputs/20260929/movers.csv",
+    "md": "outputs/20260929/movers.md",
+    "daily_csv": "docs/results/daily/20260929.csv",
+    "daily_md": "docs/results/daily/20260929.md"
   },
-  "run_at": "2026-09-29T01:23:24"
+  "run_at": "2026-09-30T00:56:39"
 }
