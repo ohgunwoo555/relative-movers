@@ -1,24 +1,501 @@
 {
-  "base_date": "20261018",
-  "T": null,
-  "note": "20261018 는 휴장일(주말) — 종료 (exit 3)",
+  "base_date": "20261019",
+  "T": "20261016",
+  "note": null,
   "top_n": 20,
-  "exit_code": 3,
-  "total_sec": 0.0,
-  "combos": [],
+  "exit_code": 0,
+  "total_sec": 87.8,
+  "combos": [
+    {
+      "market": "KOSPI",
+      "period": "1d",
+      "ok": true,
+      "window": {
+        "ref_date": "20261016",
+        "from": "20261016",
+        "base_date": "20261015"
+      },
+      "from": "20261016",
+      "base_date": "20261015",
+      "n_calc_rows": 806,
+      "market_ret": 2.0494326836171473,
+      "inputs": {
+        "n_price_change": 940,
+        "n_delisted_rows": 0,
+        "index_rows": 2,
+        "n_market_cap": 940
+      },
+      "excess_stats": {
+        "count": 806.0,
+        "mean": -0.147,
+        "std": 2.708,
+        "min": -13.221,
+        "25%": -1.539,
+        "50%": -0.331,
+        "75%": 1.175,
+        "max": 27.938
+      },
+      "error": null,
+      "error_class": null,
+      "timings": {
+        "window": 2.54,
+        "index_ohlcv": 8.44,
+        "price_change": 2.25,
+        "calc": 0.01,
+        "rank": 0.01
+      },
+      "n_ranked": 40
+    },
+    {
+      "market": "KOSPI",
+      "period": "1w",
+      "ok": true,
+      "window": {
+        "ref_date": "20261009",
+        "from": "20261012",
+        "base_date": "20261008"
+      },
+      "from": "20261012",
+      "base_date": "20261008",
+      "n_calc_rows": 806,
+      "market_ret": -14.456536667305574,
+      "inputs": {
+        "n_price_change": 941,
+        "n_delisted_rows": 1,
+        "index_rows": 6,
+        "n_market_cap": 940
+      },
+      "excess_stats": {
+        "count": 806.0,
+        "mean": 10.872,
+        "std": 7.754,
+        "min": -14.477,
+        "25%": 7.751,
+        "50%": 11.527,
+        "75%": 14.178,
+        "max": 86.424
+      },
+      "error": null,
+      "error_class": null,
+      "timings": {
+        "window": 2.49,
+        "index_ohlcv": 1.25,
+        "price_change": 3.4,
+        "calc": 0.01,
+        "rank": 0.01
+      },
+      "n_ranked": 40
+    },
+    {
+      "market": "KOSPI",
+      "period": "1m",
+      "ok": true,
+      "window": {
+        "ref_date": "20260916",
+        "from": "20260916",
+        "base_date": "20260915"
+      },
+      "from": "20260916",
+      "base_date": "20260915",
+      "n_calc_rows": 810,
+      "market_ret": -14.4737040647266,
+      "inputs": {
+        "n_price_change": 943,
+        "n_delisted_rows": 3,
+        "index_rows": 20,
+        "n_market_cap": 940
+      },
+      "excess_stats": {
+        "count": 810.0,
+        "mean": 10.355,
+        "std": 12.575,
+        "min": -45.475,
+        "25%": 4.95,
+        "50%": 10.119,
+        "75%": 14.197,
+        "max": 161.008
+      },
+      "error": null,
+      "error_class": null,
+      "timings": {
+        "window": 2.53,
+        "index_ohlcv": 1.27,
+        "price_change": 2.36,
+        "calc": 0.01,
+        "rank": 0.01
+      },
+      "n_ranked": 40
+    },
+    {
+      "market": "KOSPI",
+      "period": "6m",
+      "ok": true,
+      "window": {
+        "ref_date": "20260416",
+        "from": "20260416",
+        "base_date": "20260415"
+      },
+      "from": "20260416",
+      "base_date": "20260415",
+      "n_calc_rows": 811,
+      "market_ret": -6.949809485191394,
+      "inputs": {
+        "n_price_change": 949,
+        "n_delisted_rows": 11,
+        "index_rows": 123,
+        "n_market_cap": 940
+      },
+      "excess_stats": {
+        "count": 811.0,
+        "mean": -11.453,
+        "std": 25.71,
+        "min": -72.17,
+        "25%": -25.833,
+        "50%": -13.449,
+        "75%": -0.77,
+        "max": 259.835
+      },
+      "error": null,
+      "error_class": null,
+      "timings": {
+        "window": 2.61,
+        "index_ohlcv": 1.29,
+        "price_change": 3.33,
+        "calc": 0.01,
+        "rank": 0.01
+      },
+      "n_ranked": 40
+    },
+    {
+      "market": "KOSPI",
+      "period": "1y",
+      "ok": true,
+      "window": {
+        "ref_date": "20251016",
+        "from": "20251016",
+        "base_date": "20251015"
+      },
+      "from": "20251016",
+      "base_date": "20251015",
+      "n_calc_rows": 815,
+      "market_ret": 54.97993044010849,
+      "inputs": {
+        "n_price_change": 959,
+        "n_delisted_rows": 25,
+        "index_rows": 246,
+        "n_market_cap": 940
+      },
+      "excess_stats": {
+        "count": 815.0,
+        "mean": -55.411,
+        "std": 58.737,
+        "min": -139.397,
+        "25%": -81.885,
+        "50%": -65.907,
+        "75%": -44.177,
+        "max": 641.668
+      },
+      "error": null,
+      "error_class": null,
+      "timings": {
+        "window": 2.52,
+        "index_ohlcv": 1.71,
+        "price_change": 4.19,
+        "calc": 0.01,
+        "rank": 0.01
+      },
+      "n_ranked": 40
+    },
+    {
+      "market": "KOSDAQ",
+      "period": "1d",
+      "ok": true,
+      "window": {
+        "ref_date": "20261016",
+        "from": "20261016",
+        "base_date": "20261015"
+      },
+      "from": "20261016",
+      "base_date": "20261015",
+      "n_calc_rows": 1607,
+      "market_ret": 4.463605057700892,
+      "inputs": {
+        "n_price_change": 1822,
+        "n_delisted_rows": 0,
+        "index_rows": 2,
+        "n_market_cap": 1822
+      },
+      "excess_stats": {
+        "count": 1607.0,
+        "mean": -1.156,
+        "std": 4.091,
+        "min": -29.119,
+        "25%": -3.338,
+        "50%": -1.615,
+        "75%": 0.399,
+        "max": 25.536
+      },
+      "error": null,
+      "error_class": null,
+      "timings": {
+        "window": 0.0,
+        "index_ohlcv": 1.26,
+        "price_change": 2.84,
+        "calc": 0.01,
+        "rank": 0.01
+      },
+      "n_ranked": 40
+    },
+    {
+      "market": "KOSDAQ",
+      "period": "1w",
+      "ok": true,
+      "window": {
+        "ref_date": "20261009",
+        "from": "20261012",
+        "base_date": "20261008"
+      },
+      "from": "20261012",
+      "base_date": "20261008",
+      "n_calc_rows": 1607,
+      "market_ret": -10.926064980331063,
+      "inputs": {
+        "n_price_change": 1821,
+        "n_delisted_rows": 1,
+        "index_rows": 6,
+        "n_market_cap": 1822
+      },
+      "excess_stats": {
+        "count": 1607.0,
+        "mean": 4.298,
+        "std": 8.607,
+        "min": -26.647,
+        "25%": -0.608,
+        "50%": 4.893,
+        "75%": 8.9,
+        "max": 72.626
+      },
+      "error": null,
+      "error_class": null,
+      "timings": {
+        "window": 0.0,
+        "index_ohlcv": 1.29,
+        "price_change": 3.2,
+        "calc": 0.01,
+        "rank": 0.01
+      },
+      "n_ranked": 40
+    },
+    {
+      "market": "KOSDAQ",
+      "period": "1m",
+      "ok": true,
+      "window": {
+        "ref_date": "20260916",
+        "from": "20260916",
+        "base_date": "20260915"
+      },
+      "from": "20260916",
+      "base_date": "20260915",
+      "n_calc_rows": 1606,
+      "market_ret": -2.1700865326620744,
+      "inputs": {
+        "n_price_change": 1820,
+        "n_delisted_rows": 8,
+        "index_rows": 20,
+        "n_market_cap": 1822
+      },
+      "excess_stats": {
+        "count": 1606.0,
+        "mean": 0.629,
+        "std": 16.24,
+        "min": -71.429,
+        "25%": -7.862,
+        "50%": -1.426,
+        "75%": 5.141,
+        "max": 127.933
+      },
+      "error": null,
+      "error_class": null,
+      "timings": {
+        "window": 0.0,
+        "index_ohlcv": 1.26,
+        "price_change": 2.6,
+        "calc": 0.01,
+        "rank": 0.01
+      },
+      "n_ranked": 40
+    },
+    {
+      "market": "KOSDAQ",
+      "period": "6m",
+      "ok": true,
+      "window": {
+        "ref_date": "20260416",
+        "from": "20260416",
+        "base_date": "20260415"
+      },
+      "from": "20260416",
+      "base_date": "20260415",
+      "n_calc_rows": 1589,
+      "market_ret": -31.034422915057757,
+      "inputs": {
+        "n_price_change": 1821,
+        "n_delisted_rows": 36,
+        "index_rows": 123,
+        "n_market_cap": 1822
+      },
+      "excess_stats": {
+        "count": 1589.0,
+        "mean": 5.087,
+        "std": 34.105,
+        "min": -60.33,
+        "25%": -13.608,
+        "50%": 0.992,
+        "75%": 15.834,
+        "max": 485.976
+      },
+      "error": null,
+      "error_class": null,
+      "timings": {
+        "window": 0.0,
+        "index_ohlcv": 1.41,
+        "price_change": 4.17,
+        "calc": 0.01,
+        "rank": 0.01
+      },
+      "n_ranked": 40
+    },
+    {
+      "market": "KOSDAQ",
+      "period": "1y",
+      "ok": true,
+      "window": {
+        "ref_date": "20251016",
+        "from": "20251016",
+        "base_date": "20251015"
+      },
+      "from": "20251016",
+      "base_date": "20251015",
+      "n_calc_rows": 1555,
+      "market_ret": -8.088167268017399,
+      "inputs": {
+        "n_price_change": 1802,
+        "n_delisted_rows": 70,
+        "index_rows": 246,
+        "n_market_cap": 1822
+      },
+      "excess_stats": {
+        "count": 1555.0,
+        "mean": -1.486,
+        "std": 75.605,
+        "min": -86.411,
+        "25%": -33.886,
+        "50%": -15.98,
+        "75%": 8.324,
+        "max": 1718.953
+      },
+      "error": null,
+      "error_class": null,
+      "timings": {
+        "window": 0.0,
+        "index_ohlcv": 1.35,
+        "price_change": 7.75,
+        "calc": 0.01,
+        "rank": 0.01
+      },
+      "n_ranked": 40
+    }
+  ],
   "failures": [],
-  "universes": {},
-  "warnings": [],
+  "universes": {
+    "KOSPI": {
+      "steps": [
+        [
+          "listed",
+          940
+        ],
+        [
+          "-etf",
+          940
+        ],
+        [
+          "-etn",
+          940
+        ],
+        [
+          "-spac",
+          940
+        ],
+        [
+          "-preferred",
+          829
+        ],
+        [
+          "-administrative(미적용)",
+          829
+        ]
+      ],
+      "warnings": [
+        "[KOSPI] exclude.administrative=true 이지만 관리종목 목록이 제공되지 않음(판별 소스 미확정, docs/administrative_issue.md) — -administrative 필터 미적용"
+      ]
+    },
+    "KOSDAQ": {
+      "steps": [
+        [
+          "listed",
+          1822
+        ],
+        [
+          "-etf",
+          1822
+        ],
+        [
+          "-etn",
+          1822
+        ],
+        [
+          "-spac",
+          1754
+        ],
+        [
+          "-preferred",
+          1751
+        ],
+        [
+          "-administrative",
+          1622
+        ]
+      ],
+      "warnings": []
+    }
+  },
+  "warnings": [
+    "[KOSPI] exclude.administrative=true 이지만 관리종목 목록이 제공되지 않음(판별 소스 미확정, docs/administrative_issue.md) — -administrative 필터 미적용"
+  ],
   "failure": null,
   "timings": {
-    "resolve_base_date": 0.0
+    "resolve_base_date": 4.14,
+    "etf_tickers": 2.63,
+    "etn_tickers": 1.0,
+    "KOSPI/listed": 1.49,
+    "KOSPI/administrative": 2.89,
+    "KOSPI/market_cap": 1.5,
+    "KOSDAQ/listed": 2.48,
+    "KOSDAQ/administrative": 0.0,
+    "KOSDAQ/market_cap": 2.17
   },
   "fetch_stats": {
-    "network_calls": 0,
-    "cache_hits": 0,
+    "network_calls": 38,
+    "cache_hits": 19,
     "retries": 0
   },
-  "n_movers_rows": 0,
-  "paths": {},
-  "run_at": "2026-10-17T23:38:56"
+  "n_movers_rows": 400,
+  "paths": {
+    "csv": "outputs/20261016/movers.csv",
+    "md": "outputs/20261016/movers.md",
+    "daily_csv": "docs/results/daily/20261016.csv",
+    "daily_md": "docs/results/daily/20261016.md"
+  },
+  "run_at": "2026-10-18T23:50:13"
 }
